@@ -110,8 +110,8 @@ for day in fileDates:
     flog.close
     outFile=ncRoot+'/pb'+day+'.nc' #path to output nc file
     #Initialise big arrays (all jobs for current day):
-    CDNC_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing)
-    AOD_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing)
+    CDNC_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
+    AOD_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
     #Loop over jobs:
     for j,jobid in enumerate(jobids):
         #Open log file here, close it at end of loop to allow reading of it during execution
