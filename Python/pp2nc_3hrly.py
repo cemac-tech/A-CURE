@@ -10,18 +10,18 @@ import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument("ppRoot",help="absolute/relative path to root directory containing the pp files",type=str)
 parser.add_argument("ncRoot",help="absolute/relative path to desired output directory",type=str)
-parser.add_argument("ppRef",help="absolute/relative path to reference pp file at the desired coarsened (N48) resolution",type=str)  
+parser.add_argument("ncRef",help="absolute/relative path to reference nc file at the desired coarsened (N48) resolution",type=str)  
 parser.add_argument("startDate",help="First day to be processed, in format YYYYMMDD, e.g. 20080701",type=str)
 parser.add_argument("endDate",help="Last day to be processed, in format YYYYMMDD, e.g. 20080710",type=str)
 args = parser.parse_args()
 ppRoot=args.ppRoot
 ncRoot=args.ncRoot
-ppRef=args.ppRef
+ncRef=args.ncRef
 startDate=args.startDate
 endDate=args.endDate
 #ppRoot = '/home/users/myoshioka/ET/Retrieved/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps'
 #ncRoot = '/group_workspaces/jasmin2/gassp/earjjo/NC_3hrly'
-#ppRef = '/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps/Links2NC/teafw/aod550_total_teafw_pm2008jan_N48_dim_att_j.nc'
+#ncRef = '/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps/Links2NC/teafw/aod550_total_teafw_pm2008jan_N48_dim_att_j.nc'
 #startDate = '20080101'
 #endDate = '20080101'
 #####
@@ -29,12 +29,12 @@ endDate=args.endDate
 #####CHECK FILES/DIRS exist
 assert os.path.exists(ppRoot), "ppRoot does not exist"
 assert os.path.exists(ncRoot), "ncRoot does not exist"
-assert os.path.exists(ppRef),"ppRef does not exist"
+assert os.path.exists(ncRef),"ncRef does not exist"
 #####
 
 #####PARAMETERS
 stash_CDNC = 'm01s38i479' #STASH code for CDNC field in pp files
-stash_AOD = ['m01s02i500','m01s02i501','m01s02i500','m01s02i500','m01s02i500'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
+stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
 ######
 
 #####GENERATE JOBID ARRAY
@@ -85,6 +85,17 @@ for date in [startDateObj + dt.timedelta(n) for n in range(numDays)]:
     #The date.strftime() functions below ensure e.g. that the day is written as '01' and not '1'
     fileDates.append(date.strftime('%Y')+date.strftime('%m')+date.strftime('%d'))
 
+#####LOAD AND STORE REFERENCE NC FILE DATA
+try:
+    refCube=iris.load(ncRef)[0]
+    lons = refCube.coord('longitude').points
+    lats = refCube.coord('latitude').points
+except:
+    print("Error: Couldn't load or extract coordinates from reference data file")
+    raise
+assert len(lats) == 73 and len(lons) == 96, "Unexpected dimensions in reference data file"
+#####
+
 #####FOR EACH DAY, LOOP OVER ALL JOBS, STORE DATA IN ONE BIG ARRAY, AND OUTPUT TO NC FILE
 nFilesRead=0
 flog=open(ncRoot+'/logfile.log','w')
@@ -99,8 +110,8 @@ for day in fileDates:
     outFile=ncRoot+'/pb'+day+'.nc' #path to output nc file
     #Initialise big arrays (all jobs for current day):
     missing=-999
-    CDNC_all=np.full(shape=(8,145,192,235),fill_value=missing)
-    AOD_all=np.full(shape=(8,145,192,235),fill_value=missing)
+    CDNC_all=np.full(shape=(8,73,96,235),fill_value=missing)
+    AOD_all=np.full(shape=(8,73,96,235),fill_value=missing)
     #Loop over jobs:
     for j,jobid in enumerate(jobids):
         #Open log file here, close it at end of loop to allow reading of it during execution
@@ -126,24 +137,21 @@ for day in fileDates:
             flog.close
             continue
         nFilesRead+=1
-        #If first file read in, store coordinate information:
+        #If first file read in, store time information:
         if nFilesRead==1:
             try:
-                lons = CDNCcube.coord('longitude').points
-                lats = CDNCcube.coord('latitude').points
                 times = CDNCcube.coord('time').points
-                levels = CDNCcube.coord('model_level_number').points
             except:
-                print("Error: Unexpected coordinate names in PP file")
+                print("Error: No time coordinate in pp file")
                 raise
         #Read in all 6 cubes relating to AOD and sum to get total AOD:
         try:
             for s,stashid in enumerate(stash_AOD):
                 modeCube=iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stashid))
                 if s==0:
-                    AODcube=modeCube.data
+                    AODcube=modeCube
                 else:
-                    AODcube+=modeCube.data
+                    AODcube+=modeCube
         except:
             flog.write('Warning: Could not load AOD data from input file '+ppFile+'. File has been skipped\n')
             flog.close
@@ -151,13 +159,16 @@ for day in fileDates:
         #***FOR NOW*** just take arithmetic mean of CDNC over all heights
         for h in range(52):
             if h==0:
-                CDNCsum=CDNCcube.data[:,h,:,:]
+                CDNCsum=CDNCcube[:,h,:,:]
             else:
-                CDNCsum+=CDNCcube.data[:,h,:,:]
+                CDNCsum+=CDNCcube[:,h,:,:]
         CDNCave=CDNCsum/52.0
+        #Regrid onto coarser resolution (N48):
+        CNDC_N48 = CDNCave.regrid(refCube, iris.analysis.Linear())
+        AOD_N48 = AODcube.regrid(refCube, iris.analysis.Linear())
         #Update big arrays (all jobs for current day)
-        CDNC_all[:,:,:,j]=CDNCave
-        AOD_all[:,:,:,j]=AODcube
+        CDNC_all[:,:,:,j]=CNDC_N48.data
+        AOD_all[:,:,:,j]=AOD_N48.data
         flog.close
 
     #Create nc file:
@@ -195,7 +206,3 @@ for day in fileDates:
     cdnc_out.units = "number per metre cubed"
     #close netCDF file
     ncfile.close()
-
-#####LOAD AND STORE REFERENCE PP FILE DATA
-#refCube=iris.load(ppRef)
-#####
