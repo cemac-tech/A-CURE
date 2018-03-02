@@ -1,36 +1,3 @@
-#Generate job id array teb[a-i][a-z]  (=234 jobs)
-
-#Insert median job id in the middle   )=235 jobs)
-
-#Set paths to:
-#  - input parent directory (contains pp files)
-#  - output parent directory (to contain nc files)
-#  - reference data file (containing desired coarsened coordinate system)
-
-#Load and store reference data with iris
-
-#Set months to process
-
-#Set stash array (codes to desired variables in pp files?)
-
-#For each job:
-#    Create a bear-bones text file (.cdl)  of netCDF metadata
-#    Use NCO ncgen command to generate a netCDF file from this metadata
-
-#For each month:
-#    For each day of the month:
-#        For each job:
-#            Set paths to specific input and output files
-#            For each stash code (variable):
-#                Load in pp cube and make a cumulative sum of all cubes
-#            Give the cube a long_name
-#            Save summed cube in intermediate netCDF file
-#            Use NCO commands ncecat and ncrename to add a 'record' dimension and then rename it to 'job'
-#            Use NCO comman ncks command to append job variable to full resolution data (???)
-#            Load imtermediate netCDF file cube back into memory
-#            Regrid to low reslution grid using iris's regrid function
-#            Save low resolution data to an intermediate netCDF file
-
 import iris
 import numpy as np
 import string
@@ -40,23 +7,23 @@ import os
 import argparse
 
 #####READ IN COMMAND LINE ARGUMENTS
-#parser = argparse.ArgumentParser()
-#parser.add_argument("ppRoot",help="absolute/relative path to root directory containing the pp files",type=str)
-#parser.add_argument("ncRoot",help="absolute/relative path to desired output directory",type=str)
-#parser.add_argument("ppRef",help="absolute/relative path to reference pp file at the desired coarsened (N48) resolution",type=str)  
-#parser.add_argument("startDate",help="First day to be processed, in format YYYYMMDD, e.g. 20080701",type=str)
-#parser.add_argument("endDate",help="Last day to be processed, in format YYYYMMDD, e.g. 20080710",type=str)
-#args = parser.parse_args()
-#ppRoot=args.ppRoot
-#ncRoot=args.ncRoot
-#ppRef=args.ppRef
-#startDate=args.startDate
-#endDate=args.endDate
-ppRoot = '/home/users/myoshioka/ET/Retrieved/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps'
-ncRoot = '/group_workspaces/jasmin2/gassp/earjjo/NC_3hrly'
-ppRef = '/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps/Links2NC/teafw/aod550_total_teafw_pm2008jan_N48_dim_att_j.nc'
-startDate = '20080101'
-endDate = '20080101'
+parser = argparse.ArgumentParser()
+parser.add_argument("ppRoot",help="absolute/relative path to root directory containing the pp files",type=str)
+parser.add_argument("ncRoot",help="absolute/relative path to desired output directory",type=str)
+parser.add_argument("ppRef",help="absolute/relative path to reference pp file at the desired coarsened (N48) resolution",type=str)  
+parser.add_argument("startDate",help="First day to be processed, in format YYYYMMDD, e.g. 20080701",type=str)
+parser.add_argument("endDate",help="Last day to be processed, in format YYYYMMDD, e.g. 20080710",type=str)
+args = parser.parse_args()
+ppRoot=args.ppRoot
+ncRoot=args.ncRoot
+ppRef=args.ppRef
+startDate=args.startDate
+endDate=args.endDate
+#ppRoot = '/home/users/myoshioka/ET/Retrieved/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps'
+#ncRoot = '/group_workspaces/jasmin2/gassp/earjjo/NC_3hrly'
+#ppRef = '/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps/Links2NC/teafw/aod550_total_teafw_pm2008jan_N48_dim_att_j.nc'
+#startDate = '20080101'
+#endDate = '20080101'
 #####
 
 #####CHECK FILES/DIRS exist
@@ -120,12 +87,14 @@ for date in [startDateObj + dt.timedelta(n) for n in range(numDays)]:
 
 #####FOR EACH DAY, LOOP OVER ALL JOBS, STORE DATA IN ONE BIG ARRAY, AND OUTPUT TO NC FILE
 nFilesRead=0
+flog=open(ncRoot+'/logfile.log','w')
+flog.close
 #Loop over days:
 for day in fileDates:
     #open and close log file to allow reading of it during execution
     flog=open(ncRoot+'/logfile.log','a')
-    flog.write("---------------------")
-    flog.write("Processing day: "+day)
+    flog.write("---------------------\n")
+    flog.write("Processing day: "+day+'\n')
     flog.close
     outFile=ncRoot+'/pb'+day+'.nc' #path to output nc file
     #Initialise big arrays (all jobs for current day):
@@ -136,24 +105,24 @@ for day in fileDates:
     for j,jobid in enumerate(jobids):
         #Open log file here, close it at end of loop to allow reading of it during execution
         flog=open(ncRoot+'/logfile.log','a')
-        flog.write("Processing job: "+jobid+" ("+str(j+1)+" of "+str(len(jobids))+")")
+        flog.write("Processing job: "+jobid+" ("+str(j+1)+" of "+str(len(jobids))+")\n")
         #Generate full PP file path
         ppFile=jobid+'a.pb'+day+'.pp' #specific pp file name
         ppPath=ppRoot+'/'+jobid+'/'+ppFile #specific pp file path
         #Check input file exists, skip if not
         if not os.path.exists(ppPath):
-            flog.write('Warning: Input file '+ppFile+'was not found. File has been skipped')
+            flog.write('Warning: Input file '+ppFile+'was not found. File has been skipped\n')
             flog.close
             continue
         #Try reading in CDNC cube and check dimensions are as expected (assume AOD cubes are OK by association):
         try:
             CDNCcube = iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stash_CDNC))
         except:
-            flog.write('Warning: Could not load CDNC data from input file '+ppFile+'. File has been skipped')
+            flog.write('Warning: Could not load CDNC data from input file '+ppFile+'. File has been skipped\n')
             flog.close
             continue
         if CDNCcube.shape != (8,52,145,192):
-            flog.write('Warning: Unexpected dimensions in input file '+ppFile+'. File has been skipped')
+            flog.write('Warning: Unexpected dimensions in input file '+ppFile+'. File has been skipped\n')
             flog.close
             continue
         nFilesRead+=1
@@ -176,7 +145,7 @@ for day in fileDates:
                 else:
                     AODcube+=modeCube.data
         except:
-            flog.write('Warning: Could not load AOD data from input file '+ppFile+'. File has been skipped')
+            flog.write('Warning: Could not load AOD data from input file '+ppFile+'. File has been skipped\n')
             flog.close
             continue
         #***FOR NOW*** just take arithmetic mean of CDNC over all heights
