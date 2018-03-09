@@ -34,7 +34,9 @@ def readAOD():
             break
         if modeCube.shape != (nTimes,N96res[0],N96res[1]):
             err=True
-            flog.write('Warning: Unexpected AOD dimensions in input file '+ppFile+'. File has been skipped\n')
+            flog.write('Warning: Unexpected AOD dimensions in input file '+ppFile+ \
+              '. Expected '+str((nTimes,N96res[0],N96res[1]))+ \
+              ', got '+str(modeCube.shape)+'. File has been skipped\n')
             flog.close
             break
         if s==0:
@@ -174,7 +176,9 @@ for day in fileDates:
             flog.close
             continue
         if CDNCcube.shape != (nTimes,nLevels,N96res[0],N96res[1]):
-            flog.write('Warning: Unexpected CDNC dimensions in input file '+ppFile+'. File has been skipped\n')
+            flog.write('Warning: Unexpected CDNC dimensions in input file '+ppFile+ \
+              '. Expected '+str((nTimes,nLevels,N96res[0],N96res[1]))+ \
+              ', got '+str(CDNCcube.shape)+'. File has been skipped\n')
             flog.close
             continue
         #Try reading in all 6 cubes relating to AOD, check dimensions are as expected, and sum to get total AOD
@@ -184,11 +188,17 @@ for day in fileDates:
         #If first file read in, store time and level information:
         if nFilesRead==1:
             try:
-                times = CDNCcube.coord('time').points
+                CDNCtimes = CDNCcube.coord('time').points
                 hgts = CDNCcube.coord('level_height').points
                 sigmas = CDNCcube.coord('sigma').points
             except:
-                print("Error: Unexpected coordinates in pp file")
+                print("Error: Unexpected coordinates for CDNC in pp file "+ppFile)
+                raise
+            try:
+                modeCube=iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stash_AOD[0]))
+                AODtimes = modeCube.coord('time').points
+            except:
+                print("Error: Unexpected time coordinates for AOD in pp file "+ppFile)
                 raise
         #***FOR NOW*** just take arithmetic mean of CDNC over all heights
         for h in range(nLevels):
@@ -210,12 +220,18 @@ for day in fileDates:
     flog=open(ncRoot+'/logfile.log','a')
     flog.write("Writing to nc file: "+outFile+'\n')
     ncfile = netCDF4.Dataset(outFile,mode='w',format='NETCDF4_CLASSIC')
-    #Add time dimension/variable:
-    t_dim = ncfile.createDimension('time',len(times))
-    t_out = ncfile.createVariable('time', np.float64, ('time'))
-    t_out[:] = times
-    t_out.units = "hours since 1970-01-01 00:00:00"
-    t_out.calendar = "gregorian"
+    #Add time dimension/variables (times are potentially different for CDNC and AOD):
+    tCDNC_dim = ncfile.createDimension('time_CDNC',len(CDNCtimes))
+    tCDNC_out = ncfile.createVariable('time_CDNC', np.float64, ('time_CDNC'))
+    tCDNC_out[:] = CDNCtimes
+    tCDNC_out.units = "hours since 1970-01-01 00:00:00"
+    tCDNC_out.calendar = "gregorian"
+    #
+    tAOD_dim = ncfile.createDimension('time_AOD',len(AODtimes))
+    tAOD_out = ncfile.createVariable('time_AOD', np.float64, ('time_AOD'))
+    tAOD_out[:] = AODtimes
+    tAOD_out.units = "hours since 1970-01-01 00:00:00"
+    tAOD_out.calendar = "gregorian"
     #Add lat/lon dimensions/variables:
     lon_dim = ncfile.createDimension('longitude', len(lons))
     lat_dim = ncfile.createDimension('latitude', len(lats))
@@ -233,11 +249,11 @@ for day in fileDates:
     job_out[:,:] = str_out
     job_out.units = "none"
     #Add AOD550 variable:
-    aod_out = ncfile.createVariable('AOD550_total', np.float64, ('time','latitude','longitude','job'))
+    aod_out = ncfile.createVariable('AOD550_total', np.float64, ('time_AOD','latitude','longitude','job'))
     aod_out[:,:,:,:] = AOD_all
     aod_out.units = "1"
     #Add CDNC variable:
-    cdnc_out = ncfile.createVariable('CDNC', np.float64, ('time','latitude','longitude','job'))
+    cdnc_out = ncfile.createVariable('CDNC', np.float64, ('time_CDNC','latitude','longitude','job'))
     cdnc_out[:,:,:,:] = CDNC_all
     cdnc_out.units = "number per metre cubed"
     #close netCDF file
