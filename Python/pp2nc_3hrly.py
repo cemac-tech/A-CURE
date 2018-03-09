@@ -24,7 +24,9 @@ def readAOD():
     """
     AODcube=0
     err=False
+    only7timesteps=False
     for s,stashid in enumerate(stash_AOD):
+        #Try loading in each mode's cube:
         try:
             modeCube=iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stashid))
         except:
@@ -32,19 +34,39 @@ def readAOD():
             flog.write('Warning: Could not load AOD data from input file '+ppFile+'. File has been skipped\n')
             flog.close
             break
-        if modeCube.shape != (nTimes,N96res[0],N96res[1]):
-            err=True
-            flog.write('Warning: Unexpected AOD dimensions in input file '+ppFile+ \
-              '. Expected '+str((nTimes,N96res[0],N96res[1]))+ \
-              ', got '+str(modeCube.shape)+'. File has been skipped\n')
-            flog.close
-            break
+        #Save the shape of the first mode, or check shape is the same as the first mode
+        if s==0:
+            mode1shape=modeCube.shape
+        else:
+            if modeCube.shape != mode1shape:
+                err=True
+                flog.write('Warning: Inconsistent AOD mode dimensions in input file '+ppFile+'. File has been skipped\n')
+                flog.close
+                break
+        #Sum over all modes:
         if s==0:
             AODcube=modeCube
         else:
             AODcube+=modeCube
-    return(AODcube,err)
-
+    #Check the dimensions are as expected:
+    if not err and AODcube.shape != (nTimes,N96res[0],N96res[1]):
+        #First check the case where there are only 7 rather than 8 timesteps.
+        #Masaru said that this sometimes happens on the first day of the month,
+        #and that in this case, we should specify the first timestep as missing
+        #but fill the other 7 timesteps:
+        if AODcube.shape == (nTimes-1,N96res[0],N96res[1]):
+            only7timesteps=True
+            flog.write('Warning: only 7 rather than 8 AOD timesteps in file '+ppFile+ \
+                   '. Assuming first timestep is missing and processing remaining 7 timesteps\n')
+            flog.close
+        else:
+            err=True
+            flog.write('Warning: Unexpected AOD dimensions in input file '+ppFile+ \
+              '. Expected '+str((nTimes,N96res[0],N96res[1]))+ \
+              ', got '+str(AODcube.shape)+'. File has been skipped\n')
+            flog.close
+    #return to main routine:
+    return(AODcube,err,only7timesteps)
 
 import argparse
 import os
@@ -141,7 +163,7 @@ assert len(lats) == N48res[0] and len(lons) == N48res[1], "Unexpected dimensions
 #####
 
 #####FOR EACH DAY, LOOP OVER ALL JOBS, STORE DATA IN ONE BIG ARRAY, AND OUTPUT TO NC FILE
-nFilesRead=0
+nFirstValidfile=0
 flog=open(ncRoot+'/logfile.log','w')
 flog.close
 #Loop over days:
@@ -182,11 +204,11 @@ for day in fileDates:
             flog.close
             continue
         #Try reading in all 6 cubes relating to AOD, check dimensions are as expected, and sum to get total AOD
-        AODcube,err = readAOD()
+        AODcube,err,only7timesteps = readAOD()
         if err==True: continue
-        nFilesRead+=1
-        #If first file read in, store time and level information:
-        if nFilesRead==1:
+        if not only7timesteps: nFirstValidfile+=1
+        #If first file read in with 8 timesteps, store time and level information:
+        if nFirstValidfile==1:
             try:
                 CDNCtimes = CDNCcube.coord('time').points
                 hgts = CDNCcube.coord('level_height').points
@@ -212,7 +234,11 @@ for day in fileDates:
         AOD_N48 = AODcube.regrid(refCube, iris.analysis.Linear())
         #Update big arrays (all jobs for current day)
         CDNC_all[:,:,:,j]=CNDC_N48.data
-        AOD_all[:,:,:,j]=AOD_N48.data
+        if not only7timesteps:
+            AOD_all[:,:,:,j]=AOD_N48.data
+        else:
+            AOD_all[1:nTimes,:,:,j]=AOD_N48.data
+        #Close log file:
         flog.close
 
     #Create nc file:
