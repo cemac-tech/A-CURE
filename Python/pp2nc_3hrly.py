@@ -1,11 +1,51 @@
-import iris
-import numpy as np
-import string
-import datetime as dt
-import netCDF4
-import os
-import argparse
+#!/usr/bin/env python2.7
+"""
+Script name: pp2nc_3hrly.py
+Author: James O'Neill. Based on very helpful python scripts provided by Masaru Yoshioka.
+Date: March 2018
+Purpose: Extract and condense information from 3-hourly pp files belonging to the UKCA26AER
+         perturbed parameter ensemble (PPE) set into netCDF format. Each netCDF file contains
+         aerosol optical depth (AOD) at 550nm and column-integrated cloud droplet number
+         concentration (CDNC) fields for all 235 PPE members for one day (8 timesteps per file)
+         on a coarsened grid (N96 down to N48)
+Usage: ./pp2nc_3hrly.py <ppRoot> <ncRoot> <ncRef> <startDate> <endDate>
+        <ppRoot> - path (either relative to the current directory, or full) to the root directory containing the pp files
+        <ncRoot> - path (relative or full) to the desired output directory
+        <ncRef> - path (relative or full) to a reference netCDF file whose coordinate system is at the desired coarsened resolution (N48) onto which the original high-resolution (N96) data should be regridded
+        <startDate> - in the format YYYYMMDD and refers to the first day to be processed
+        <endDate> - in the format YYYYMMDD and refers to the last day (inclusive) to be processed
+Output: Daily netCDF files (8 timesteps per file) with the naming convention <ncRoot>/pbYYYYMMDD.nc
+"""
 
+def readAOD():
+    """
+    Try reading in all 6 cubes relating to AOD, check dimensions are as expected, and sum to get total AOD.
+    Return with error flag if something goes wrong, so that this file can be skipped by the main routine.
+    """
+    AODcube=0
+    err=False
+    for s,stashid in enumerate(stash_AOD):
+        try:
+            modeCube=iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stashid))
+        except:
+            err=True
+            flog.write('Warning: Could not load AOD data from input file '+ppFile+'. File has been skipped\n')
+            flog.close
+            break
+        if modeCube.shape != (nTimes,N96res[0],N96res[1]):
+            err=True
+            flog.write('Warning: Unexpected AOD dimensions in input file '+ppFile+'. File has been skipped\n')
+            flog.close
+            break
+        if s==0:
+            AODcube=modeCube
+        else:
+            AODcube+=modeCube
+    return(AODcube,err)
+
+
+import argparse
+import os
 #####READ IN COMMAND LINE ARGUMENTS
 parser = argparse.ArgumentParser()
 parser.add_argument("ppRoot",help="absolute/relative path to root directory containing the pp files",type=str)
@@ -26,6 +66,13 @@ assert os.path.exists(ppRoot), "ppRoot does not exist"
 assert os.path.exists(ncRoot), "ncRoot does not exist"
 assert os.path.exists(ncRef),"ncRef does not exist"
 #####
+
+import iris
+import numpy as np
+import string
+import datetime as dt
+import netCDF4
+from dateutil.parser import parse
 
 #####PARAMETERS
 stash_CDNC = 'm01s38i479' #STASH code for CDNC field in pp files
@@ -63,18 +110,12 @@ for c1 in string.ascii_lowercase[7:9]:
 #The 'pb' indicates 3-hrly output runs ('pm', 'pa' and 'pc' indicate monthly,
 #daily and 1hrly, respectively).
 try:
-    startYr=startDate[0:4]
-    startMon=startDate[4:6]
-    startDay=startDate[6:8]
-    startDateObj=dt.date(int(startYr),int(startMon),int(startDay))
+    startDateObj=parse(startDate)
 except:
     print("Error: startDate input parameter in unexpected format")
     raise
 try:
-    endYr=endDate[0:4]
-    endMon=endDate[4:6]
-    endDay=endDate[6:8]
-    endDateObj=dt.date(int(endYr),int(endMon),int(endDay))
+    endDateObj=parse(endDate)
 except:
     print("Error: endDate input parameter in unexpected format")
     raise
@@ -125,7 +166,7 @@ for day in fileDates:
             flog.write('Warning: Input file '+ppFile+'was not found. File has been skipped\n')
             flog.close
             continue
-        #Try reading in CDNC cube and check dimensions are as expected (assume AOD cubes are OK by association):
+        #Try reading in CDNC cube and check dimensions are as expected
         try:
             CDNCcube = iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stash_CDNC))
         except:
@@ -133,29 +174,22 @@ for day in fileDates:
             flog.close
             continue
         if CDNCcube.shape != (nTimes,nLevels,N96res[0],N96res[1]):
-            flog.write('Warning: Unexpected dimensions in input file '+ppFile+'. File has been skipped\n')
+            flog.write('Warning: Unexpected CDNC dimensions in input file '+ppFile+'. File has been skipped\n')
             flog.close
             continue
+        #Try reading in all 6 cubes relating to AOD, check dimensions are as expected, and sum to get total AOD
+        AODcube,err = readAOD()
+        if err==True: continue
         nFilesRead+=1
-        #If first file read in, store time information:
+        #If first file read in, store time and level information:
         if nFilesRead==1:
             try:
                 times = CDNCcube.coord('time').points
+                hgts = CDNCcube.coord('level_height').points
+                sigmas = CDNCcube.coord('sigma').points
             except:
-                print("Error: No time coordinate in pp file")
+                print("Error: Unexpected coordinates in pp file")
                 raise
-        #Read in all 6 cubes relating to AOD and sum to get total AOD:
-        try:
-            for s,stashid in enumerate(stash_AOD):
-                modeCube=iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stashid))
-                if s==0:
-                    AODcube=modeCube
-                else:
-                    AODcube+=modeCube
-        except:
-            flog.write('Warning: Could not load AOD data from input file '+ppFile+'. File has been skipped\n')
-            flog.close
-            continue
         #***FOR NOW*** just take arithmetic mean of CDNC over all heights
         for h in range(nLevels):
             if h==0:
