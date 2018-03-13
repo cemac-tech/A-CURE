@@ -1,17 +1,23 @@
 #!/usr/bin/env python2.7
 """
 Script name: pp2nc_3hrly.py
-Author: James O'Neill. Based on very helpful python scripts provided by Masaru Yoshioka.
+Author: James O'Neill. Based on very helpful python scripts provided by Masaru Yoshioka as well as
+        UCKA example scripts pointed to by Kirsty Pringle
 Date: March 2018
 Purpose: Extract and condense information from 3-hourly pp files belonging to the UKCA26AER
          perturbed parameter ensemble (PPE) set into netCDF format. Each netCDF file contains
          aerosol optical depth (AOD) at 550nm and column-integrated cloud droplet number
          concentration (CDNC) fields for all 235 PPE members for one day (8 timesteps per file)
          on a coarsened grid (N96 down to N48)
-Usage: ./pp2nc_3hrly.py <ppRoot> <ncRoot> <ncRef> <startDate> <endDate>
-        <ppRoot> - path (either relative to the current directory, or full) to the root directory containing the pp files
+Usage: ./pp2nc_3hrly.py <ppRoot> <ncRoot> <ncRef> <orogFile> <startDate> <endDate>
+        <ppRoot> - path (either relative to the current directory, or full) to the root directory
+                   containing the pp files
+        <orogFile> - path (relative or full) to ancilliary UM file containing the orgraphy data
+                     (file typically called 'qrparm.orog')
+        <ncRef> - path (relative or full) to a reference netCDF file whose coordinate system is at
+                  the desired coarsened resolution (N48) onto which the original high-resolution (N96)
+                  data should be regridded
         <ncRoot> - path (relative or full) to the desired output directory
-        <ncRef> - path (relative or full) to a reference netCDF file whose coordinate system is at the desired coarsened resolution (N48) onto which the original high-resolution (N96) data should be regridded
         <startDate> - in the format YYYYMMDD and refers to the first day to be processed
         <endDate> - in the format YYYYMMDD and refers to the last day (inclusive) to be processed
 Output: Daily netCDF files (8 timesteps per file) with the naming convention <ncRoot>/pbYYYYMMDD.nc
@@ -71,24 +77,30 @@ def readAOD():
 import argparse
 import os
 #####READ IN COMMAND LINE ARGUMENTS
-parser = argparse.ArgumentParser()
+parser = argparse.ArgumentParser(description="Script to extract and condense information from 3-hourly pp files belonging to \
+         the UKCA26AER perturbed parameter ensemble set into netCDF format. Each resulting netCDF file contains aerosol optical \
+         depth at 550nm and column-integrated cloud droplet number concentration fields for all 235 PPE members for one day \
+         (8 timesteps per file) on a coarsened grid (N96 down to N48)")
 parser.add_argument("ppRoot",help="absolute/relative path to root directory containing the pp files",type=str)
-parser.add_argument("ncRoot",help="absolute/relative path to desired output directory",type=str)
-parser.add_argument("ncRef",help="absolute/relative path to reference nc file at the desired coarsened (N48) resolution",type=str)  
+parser.add_argument("orogFile",help="absolute/relative path to orography data file",type=str) 
+parser.add_argument("ncRef",help="absolute/relative path to reference nc file at the desired coarsened (N48) resolution",type=str)
+parser.add_argument("ncRoot",help="absolute/relative path to desired output directory",type=str) 
 parser.add_argument("startDate",help="First day to be processed, in format YYYYMMDD, e.g. 20080701",type=str)
 parser.add_argument("endDate",help="Last day to be processed, in format YYYYMMDD, e.g. 20080710",type=str)
 args = parser.parse_args()
 ppRoot=args.ppRoot
-ncRoot=args.ncRoot
+orogFile=args.orogFile
 ncRef=args.ncRef
+ncRoot=args.ncRoot
 startDate=args.startDate
 endDate=args.endDate
 #####
 
 #####CHECK FILES/DIRS exist
 assert os.path.exists(ppRoot), "ppRoot does not exist"
+assert os.path.exists(orogFile), "orogFile does not exist"
+assert os.path.exists(ncRef), "ncRef does not exist"
 assert os.path.exists(ncRoot), "ncRoot does not exist"
-assert os.path.exists(ncRef),"ncRef does not exist"
 #####
 
 import iris
@@ -101,12 +113,13 @@ from dateutil.parser import parse
 #####PARAMETERS
 stash_CDNC = 'm01s38i479' #STASH code for CDNC field in pp files
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
+stash_orog = 'm01s00i033' #STASH code for orography data
 maxDays = 31 #Maximum number of days that can be processed in one go
 N96res=(145,192) #Expected number of lats/lons in finer resolution data
 N48res=(73,96) #Expected number of lats/lons in coarser resolution data
 nTimes=8 #Expected number of times in pp files (one day at 3-hrly resolution per file)
-nLevels=52 #Expected number vertical levels in pp files
-missing=-999 #Missing value written to nc file if pp file is skipped
+nLevels=52 #Expected number of vertical levels in pp files
+missing=-999 #Missing value written to nc file if field is missing
 ######
 
 #####GENERATE JOBID ARRAY
@@ -144,12 +157,24 @@ except:
     print("Error: endDate input parameter in unexpected format")
     raise
 numDays=(endDateObj-startDateObj).days + 1 #Add one to include both extremeties
-assert numDays > 0, "Error: startDate must come before endDate"
-assert numDays <= maxDays, "Error: Can only process up to 31 days of data at a time"
+assert numDays > 0, "startDate must come before endDate"
+assert numDays <= maxDays, "Can only process up to 31 days of data at a time"
 fileDates=[]
 for date in [startDateObj + dt.timedelta(n) for n in range(numDays)]:
     #The date.strftime() functions below ensure e.g. that the day is written as '01' and not '1'
     fileDates.append(date.strftime('%Y')+date.strftime('%m')+date.strftime('%d'))
+
+#####LOAD AND STORE OROGRAPHY DATA
+try:
+    orog=iris.load_cube(orogFile,iris.AttributeConstraint(STASH=stash_orog))
+    #Create auxiliary coordinate for orography:
+    auxcoord=iris.coords.AuxCoord(orog.data,standard_name=str(orog.standard_name),
+                      long_name="orography",var_name="orog",units=orog.units)
+except:
+    print("Error: Could not load in orography file "+orogFile)
+    raise
+assert orog.shape == N96res, "Unexpected dimensions in orography data file"
+#####
 
 #####LOAD AND STORE REFERENCE NC FILE DATA
 try:
@@ -163,7 +188,7 @@ assert len(lats) == N48res[0] and len(lons) == N48res[1], "Unexpected dimensions
 #####
 
 #####FOR EACH DAY, LOOP OVER ALL JOBS, STORE DATA IN ONE BIG ARRAY, AND OUTPUT TO NC FILE
-nFirstValidfile=0
+nValidFiles=0
 flog=open(ncRoot+'/logfile.log','w')
 flog.close
 #Loop over days:
@@ -175,7 +200,7 @@ for day in fileDates:
     flog.close
     outFile=ncRoot+'/pb'+day+'.nc' #path to output nc file
     #Initialise big arrays (all jobs for current day):
-    CDNC_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
+    CDNpm2_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
     AOD_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
     #Loop over jobs:
     for j,jobid in enumerate(jobids):
@@ -206,13 +231,11 @@ for day in fileDates:
         #Try reading in all 6 cubes relating to AOD, check dimensions are as expected, and sum to get total AOD
         AODcube,err,only7timesteps = readAOD()
         if err==True: continue
-        if not only7timesteps: nFirstValidfile+=1
-        #If first file read in with 8 timesteps, store time and level information:
-        if nFirstValidfile==1:
+        if not only7timesteps: nValidFiles+=1
+        #If first file read in with 8 timesteps, store time information:
+        if nValidFiles==1:
             try:
                 CDNCtimes = CDNCcube.coord('time').points
-                hgts = CDNCcube.coord('level_height').points
-                sigmas = CDNCcube.coord('sigma').points
             except:
                 print("Error: Unexpected coordinates for CDNC in pp file "+ppFile)
                 raise
@@ -222,18 +245,27 @@ for day in fileDates:
             except:
                 print("Error: Unexpected time coordinates for AOD in pp file "+ppFile)
                 raise
-        #***FOR NOW*** just take arithmetic mean of CDNC over all heights
-        for h in range(nLevels):
-            if h==0:
-                CDNCsum=CDNCcube[:,h,:,:]
-            else:
-                CDNCsum+=CDNCcube[:,h,:,:]
-        CDNCave=CDNCsum/float(nLevels)
+                
+        ###Calculate column-integrated CDNC using IRIS method:
+        CDNCcube.add_aux_coord(auxcoord,(2,3,)) #Add auxiliary orography coordinate to cube on lat/lon grid
+        #Create a hybrid-height coordinate factory with the formula z = a + b * orog:
+        factory=iris.aux_factory.HybridHeightFactory(delta=CDNCcube.coord("level_height"),
+                sigma=CDNCcube.coord("sigma"),orography=CDNCcube.coord("surface_altitude")) 
+        CDNCcube.add_aux_factory(factory) #Add factory to cube to create altitude derived coordinate
+        #Calculate depth of each grid cell as difference between altitude bounds:
+        depths = CDNCcube.coord('altitude').bounds[:,:,:,1] - CDNCcube.coord('altitude').bounds[:,:,:,0]
+        #Multiply each CDNC data point by the depth of its cell to give CDN per m^2 through that cell:
+        CDNCcube.data = CDNCcube.data * depths
+        #Sum all data from each column to give CDN per m^2 through entire atmosphere
+        CDNCcube_int=CDNCcube.collapsed('model_level_number',iris.analysis.SUM)
+        
         #Regrid onto coarser resolution (N48):
-        CNDC_N48 = CDNCave.regrid(refCube, iris.analysis.Linear())
+        #Note: Currently using IRIS's bilinear regridding method. Discussion is ongoing as to whether this 
+        #is the most appropriate method.
+        CNDpm2_N48 = CDNCcube_int.regrid(refCube, iris.analysis.Linear())
         AOD_N48 = AODcube.regrid(refCube, iris.analysis.Linear())
         #Update big arrays (all jobs for current day)
-        CDNC_all[:,:,:,j]=CNDC_N48.data
+        CDNpm2_all[:,:,:,j]=CNDpm2_N48.data
         if not only7timesteps:
             AOD_all[:,:,:,j]=AOD_N48.data
         else:
@@ -242,20 +274,22 @@ for day in fileDates:
         flog.close
 
     #Create nc file:
-    assert not (np.max(CDNC_all) == missing and np.min(CDNC_all) == missing), "No processed data"
+    assert nValidFiles > 0, "No processed data"
     flog=open(ncRoot+'/logfile.log','a')
     flog.write("Writing to nc file: "+outFile+'\n')
     ncfile = netCDF4.Dataset(outFile,mode='w',format='NETCDF4_CLASSIC')
-    #Add time dimension/variables (times are potentially different for CDNC and AOD):
-    tCDNC_dim = ncfile.createDimension('time_CDNC',len(CDNCtimes))
-    tCDNC_out = ncfile.createVariable('time_CDNC', np.float64, ('time_CDNC'))
-    tCDNC_out[:] = CDNCtimes
-    tCDNC_out.units = "hours since 1970-01-01 00:00:00"
-    tCDNC_out.calendar = "gregorian"
+    #Add time dimension/variables (times are different for CDN/m2 and AOD):
+    tCDNpm2_dim = ncfile.createDimension('time_CDNperm2',len(CDNCtimes))
+    tCDNpm2_out = ncfile.createVariable('time_CDNperm2', np.float64, ('time_CDNperm2'))
+    tCDNpm2_out[:] = CDNCtimes
+    tCDNpm2_out.long_name = "Time associated with CDN per m^2 fields"
+    tCDNpm2_out.units = "hours since 1970-01-01 00:00:00"
+    tCDNpm2_out.calendar = "gregorian"
     #
     tAOD_dim = ncfile.createDimension('time_AOD',len(AODtimes))
     tAOD_out = ncfile.createVariable('time_AOD', np.float64, ('time_AOD'))
     tAOD_out[:] = AODtimes
+    tAOD_out.long_name = "Time associated with AOD fields"
     tAOD_out.units = "hours since 1970-01-01 00:00:00"
     tAOD_out.calendar = "gregorian"
     #Add lat/lon dimensions/variables:
@@ -265,6 +299,10 @@ for day in fileDates:
     lat_out = ncfile.createVariable('latitude', np.float64, ('latitude'))
     lon_out[:] = lons
     lat_out[:] = lats
+    lon_out.long_name="longitude"
+    lat_out.long_name="latitude"
+    lon_out.standard_name="longitude"
+    lat_out.standard_name="latitude"
     lon_out.units="degrees_east"
     lat_out.units="degrees_north"
     #Add job dimension/variable. Note that multi-character strings must be handled using stringtochar:
@@ -273,15 +311,18 @@ for day in fileDates:
     str_out = netCDF4.stringtochar(np.array(jobids,'S5'))
     job_out = ncfile.createVariable('job', 'S1', ('job','nchar'))
     job_out[:,:] = str_out
+    job_out.long_name = "job index of UKCA26AER PPE member"
     job_out.units = "none"
     #Add AOD550 variable:
     aod_out = ncfile.createVariable('AOD550_total', np.float64, ('time_AOD','latitude','longitude','job'))
     aod_out[:,:,:,:] = AOD_all
-    aod_out.units = "1"
-    #Add CDNC variable:
-    cdnc_out = ncfile.createVariable('CDNC', np.float64, ('time_CDNC','latitude','longitude','job'))
-    cdnc_out[:,:,:,:] = CDNC_all
-    cdnc_out.units = "number per metre cubed"
+    aod_out.long_name="Aerosol optical depth at 550nm"
+    aod_out.units = "none"
+    #Add CDN per m^2 variable:
+    cdnpm2_out = ncfile.createVariable('CDN_per_m2', np.float64, ('time_CDNperm2','latitude','longitude','job'))
+    cdnpm2_out[:,:,:,:] = CDNpm2_all
+    cdnpm2_out.long_name="Column integrated cloud droplet number concentration (i.e. cloud droplet number per m^2)"
+    cdnpm2_out.units = "m-2"
     #close netCDF file
     ncfile.close()
     flog.close
