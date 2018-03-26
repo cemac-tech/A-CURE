@@ -5,10 +5,10 @@ Author: James O'Neill. Based on very helpful python scripts provided by Masaru Y
         UCKA example scripts pointed to by Kirsty Pringle
 Date: March 2018
 Purpose: Extract and condense information from 3-hourly pp files belonging to the UKCA26AER
-         perturbed parameter ensemble (PPE) set into netCDF format. Each netCDF file contains
-         aerosol optical depth (AOD) at 550nm and column-integrated cloud droplet number
-         concentration (CDNC) fields for all 235 PPE members for one day (8 timesteps per file)
-         on a coarsened grid (N96 down to N48)
+         perturbed parameter ensemble (PPE) set into netCDF format. One set of netCDF files
+         contains aerosol optical depth (AOD) at 550nm, and another set contain column-integrated
+         cloud droplet number concentration (CDNC) fields for all 235 PPE members for one day
+         (8 timesteps per file) on a coarsened grid (N96 down to N48)
 Usage: ./pp2nc_3hrly.py <ppRoot> <ncRoot> <ncRef> <orogFile> <startDate> <endDate>
         <ppRoot> - path (either relative to the current directory, or full) to the root directory
                    containing the pp files
@@ -20,7 +20,9 @@ Usage: ./pp2nc_3hrly.py <ppRoot> <ncRoot> <ncRef> <orogFile> <startDate> <endDat
         <ncRoot> - path (relative or full) to the desired output directory
         <startDate> - in the format YYYYMMDD and refers to the first day to be processed
         <endDate> - in the format YYYYMMDD and refers to the last day (inclusive) to be processed
-Output: Daily netCDF files (8 timesteps per file) with the naming convention <ncRoot>/pbYYYYMMDD.nc
+Output: Daily netCDF files (8 timesteps per file) with the naming convention 
+        <ncRoot>/aod_tebaa-tebiz_teafw_pbYYYYMMDD_N48.nc (for AOD), and
+        <ncRoot>/cdn_tebaa-tebiz_teafw_pbYYYYMMDD_N48.nc (for CDN)
 """
 
 def readAOD():
@@ -119,7 +121,7 @@ N96res=(145,192) #Expected number of lats/lons in finer resolution data
 N48res=(73,96) #Expected number of lats/lons in coarser resolution data
 nTimes=8 #Expected number of times in pp files (one day at 3-hrly resolution per file)
 nLevels=52 #Expected number of vertical levels in pp files
-missing=-999 #Missing value written to nc file if field is missing
+missing=np.nan #Missing value written to nc file if field is missing
 ######
 
 #####GENERATE JOBID ARRAY
@@ -198,7 +200,8 @@ for day in fileDates:
     flog.write("---------------------\n")
     flog.write("Processing day: "+day+'\n')
     flog.close
-    outFile=ncRoot+'/pb'+day+'.nc' #path to output nc file
+    outFileAOD=ncRoot+'/aod550_tebaa-tebiz_teafw_pb'+day+'_N48.nc' #path to AOD output nc file
+    outFileCDN=ncRoot+'/cdn_tebaa-tebiz_teafw_pb'+day+'_N48.nc' #path to CDN output nc file
     #Initialise big arrays (all jobs for current day):
     CDNpm2_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
     AOD_all=np.full(shape=(nTimes,N48res[0],N48res[1],len(jobids)),fill_value=missing,dtype=np.float64)
@@ -273,23 +276,17 @@ for day in fileDates:
         #Close log file:
         flog.close
 
-    #Create nc file:
     assert nValidFiles > 0, "No processed data"
     flog=open(ncRoot+'/logfile.log','a')
-    flog.write("Writing to nc file: "+outFile+'\n')
-    ncfile = netCDF4.Dataset(outFile,mode='w',format='NETCDF4_CLASSIC')
-    #Add time dimension/variables (times are different for CDN/m2 and AOD):
-    tCDNpm2_dim = ncfile.createDimension('time_CDNperm2',len(CDNCtimes))
-    tCDNpm2_out = ncfile.createVariable('time_CDNperm2', np.float64, ('time_CDNperm2'))
-    tCDNpm2_out[:] = CDNCtimes
-    tCDNpm2_out.long_name = "Time associated with CDN per m^2 fields"
-    tCDNpm2_out.units = "hours since 1970-01-01 00:00:00"
-    tCDNpm2_out.calendar = "gregorian"
-    #
-    tAOD_dim = ncfile.createDimension('time_AOD',len(AODtimes))
-    tAOD_out = ncfile.createVariable('time_AOD', np.float64, ('time_AOD'))
+    ####Create AOD nc file:
+    flog.write("Writing AOD fields to nc file: "+outFileAOD+'\n')
+    ncfile = netCDF4.Dataset(outFileAOD,mode='w',format='NETCDF4_CLASSIC')
+    #Add time dimension/variable:
+    tAOD = ncfile.createDimension('time',len(AODtimes))
+    tAOD_out = ncfile.createVariable('time', np.float64, ('time'))
     tAOD_out[:] = AODtimes
-    tAOD_out.long_name = "Time associated with AOD fields"
+    tAOD_out.long_name = "time"
+    tAOD_out.standard_name = "time"
     tAOD_out.units = "hours since 1970-01-01 00:00:00"
     tAOD_out.calendar = "gregorian"
     #Add lat/lon dimensions/variables:
@@ -314,15 +311,54 @@ for day in fileDates:
     job_out.long_name = "job index of UKCA26AER PPE member"
     job_out.units = "none"
     #Add AOD550 variable:
-    aod_out = ncfile.createVariable('AOD550_total', np.float64, ('time_AOD','latitude','longitude','job'))
+    aod_out = ncfile.createVariable('aod550', np.float64, ('time','latitude','longitude','job'),fill_value=missing)
     aod_out[:,:,:,:] = AOD_all
     aod_out.long_name="Aerosol optical depth at 550nm"
     aod_out.units = "none"
+    aod_out.stash_codes="summation of m01s02i500, m01s02i501, m01s02i502, m01s02i503, m01s02i504, m01s02i505"
+    aod_out.stash_names="AITKENMODESOLUBLEOPTDEPNONADV, ACCUMMODESOLUBLEOPTDEPNONADV, COARSEMODESOLUBLEOPTDEPNONADV, \
+    AITKENMODEINSOLOPTDEPNONADV, ACCUMMODEINSOLOPTDEPNONADV, COARSEMODEINSOLOPTDEPNONADV"
+    #close netCDF file
+    ncfile.close()
+    
+    ####Create CDN nc file:
+    flog.write("Writing CDN fields to nc file: "+outFileCDN+'\n')
+    ncfile = netCDF4.Dataset(outFileCDN,mode='w',format='NETCDF4_CLASSIC')
+    #Add time dimension/variables:
+    tCDN_dim = ncfile.createDimension('time',len(CDNCtimes))
+    tCDN_out = ncfile.createVariable('time', np.float64, ('time'))
+    tCDN_out[:] = CDNCtimes
+    tCDN_out.long_name = "time"
+    tCDN_out.standard_name = "time"
+    tCDN_out.units = "hours since 1970-01-01 00:00:00"
+    tCDN_out.calendar = "gregorian"
+    #Add lat/lon dimensions/variables:
+    lon_dim = ncfile.createDimension('longitude', len(lons))
+    lat_dim = ncfile.createDimension('latitude', len(lats))
+    lon_out = ncfile.createVariable('longitude', np.float64, ('longitude'))
+    lat_out = ncfile.createVariable('latitude', np.float64, ('latitude'))
+    lon_out[:] = lons
+    lat_out[:] = lats
+    lon_out.long_name="longitude"
+    lat_out.long_name="latitude"
+    lon_out.standard_name="longitude"
+    lat_out.standard_name="latitude"
+    lon_out.units="degrees_east"
+    lat_out.units="degrees_north"
+    #Add job dimension/variable. Note that multi-character strings must be handled using stringtochar:
+    job_dim = ncfile.createDimension('job',len(jobids))
+    nchar_dim = ncfile.createDimension('nchar',5)
+    str_out = netCDF4.stringtochar(np.array(jobids,'S5'))
+    job_out = ncfile.createVariable('job', 'S1', ('job','nchar'))
+    job_out[:,:] = str_out
+    job_out.long_name = "job index of UKCA26AER PPE member"
+    job_out.units = "none"
     #Add CDN per m^2 variable:
-    cdnpm2_out = ncfile.createVariable('CDN_per_m2', np.float64, ('time_CDNperm2','latitude','longitude','job'))
-    cdnpm2_out[:,:,:,:] = CDNpm2_all
-    cdnpm2_out.long_name="Column integrated cloud droplet number concentration (i.e. cloud droplet number per m^2)"
-    cdnpm2_out.units = "m-2"
+    cdn_out = ncfile.createVariable('cdn', np.float64, ('time','latitude','longitude','job'),fill_value=missing)
+    cdn_out[:,:,:,:] = CDNpm2_all
+    cdn_out.long_name="Column integrated cloud droplet number concentration (i.e. cloud droplet number per m^2)"
+    cdn_out.units = "m-2"
+    cdn_out.stash_code="column-integrated m01s38i479 per m^2"
     #close netCDF file
     ncfile.close()
     flog.close
