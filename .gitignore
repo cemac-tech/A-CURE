@@ -1,0 +1,13 @@
+#Ignore...
+
+#All files with these extensions:
+*.directory
+*.pyc
+*.log
+
+#All latex files other than the .tex files
+Docs/*.aux
+Docs/*.out
+Docs/*.gz
+Docs/*.toc
+Docs/*.pdf

@@ -32,15 +32,15 @@
 
 \section{Python scripts}
 
-\subsection{pp2nc\_3hrly.py}
+\subsection{pp2nc\_AOD\_CDN\_3hrly.py}
 
 \subsubsection{Purpose}
 
-Extract and condense information from 3-hourly pp files belonging to the UKCA26AER perturbed parameter ensemble (PPE) set into netCDF format. Each netCDF file contains aerosol optical depth (AOD) at 550nm and column-integrated cloud droplet number concentration (CDNC) fields for all 235 PPE members for one day (8 timesteps per file) on a coarsened grid (N96 down to N48).
+Extract and condense information from 3-hourly pp files belonging to the UKCA26AER perturbed parameter ensemble (PPE) set into netCDF format. One set of netCDF files contains aerosol optical depth (AOD) at 550nm, and another set contain column-integrated cloud droplet number concentration (CDNC) fields for all 235 PPE members for one day (8 timesteps per file) on a coarsened grid (N96 down to N48)
 
 \subsubsection{Usage}
 The script can be run from the command line as follows:\\
-\tab \texttt{\$ ./pp2nc\_3hrly.py <ppRoot> <orogFile> <ncRef> <ncRoot> <startDate> <endDate>}\\
+\tab \texttt{\$ ./pp2nc\_AOD\_CDN\_3hrly.py <ppRoot> <orogFile> <ncRef> <ncRoot> <startDate> <endDate>}\\
 where:
 \begin{itemize}
 \item \texttt{<ppRoot>} is the path (either relative to the current directory, or full) to the root directory containing the pp files. The expected file naming convention under this root directory is described further below.
@@ -51,7 +51,7 @@ where:
 \item \texttt{<endDate>} is in the format YYYYMMDD and refers to the last day (inclusive) to be processed 
 \end{itemize}
 It is also possible to see the above information in the terminal by typing:\\
-\tab \texttt{\$ ./pp2nc\_3hrly.py --help}
+\tab \texttt{\$ ./pp2nc\_AOD\_CDN\_3hrly.py --help}
 
 \subsubsection{Dependencies}
 The script has been designed to run on the JASMIN analysis servers and/or LOTUS (which have access to the pp files that reside in the GASSP/UKCA group workspaces). Running the script will automatically choose the python2.7 interpreter, as it is this version of python that has access to all the scientific packages (e.g. IRIS) installed on JASMIN.\\
@@ -60,12 +60,12 @@ For production runs, it is recommended to use LOTUS (batch computing) rather tha
 \begin{spacing}{1}
 \begin{lstlisting}
 #!/bin/bash
-#BSUB -q short-seial
-#BSUB -J pp2nc_3hrly
-#BSUB -o pp2nc_3hrly.out 
-#BSUB -e pp2nc_3hrly.err 
+#BSUB -q short-serial
+#BSUB -J pp2nc_AOD_CDN_3hrly
+#BSUB -o pp2nc_AOD_CDN_3hrly.out 
+#BSUB -e pp2nc_AOD_CDN_3hrly.err 
 #BSUB -W 05:00
-./pp2nc_3hrly.py /ppRoot/path /orogFile/path /ncRef/path /ncRoot/path ...
+./pp2nc_AOD_CDN_3hrly.py /ppRoot/path /orogFile/path /ncRef/path /ncRoot/path ...
   ... 20080701 20080710
 \end{lstlisting}
 \end{spacing}
@@ -80,8 +80,8 @@ The script expects the input pp files to have the following directory structure/
 The main root directoy `ppRoot' is provided as a command line argument. `pb' indicates 3-hourly output files (`pm', `pa' and `pc' indicate monthly, daily and hourly output files).\\\\
 The script expects 8 timesteps per day in each input pp file (3-hourly). However, it has also been designed to deal with the case where there are only 7 timesteps in the six AOD variables (modes). This is because it has been identified that some of the pp files for the first day of a calendar month are missing data for first AOD timestep (00:20). When this occurs, the 00:20 field is re-inserted into the output netCDF file and filled with missing values (NaN) so that the grid remains regular (as is necessary). As an example, there are 16 (out of 235) PPE members with a missing first timestep on 2008-07-01.\\\\
 The 550nm AOD fields are calculated on the fine domain (N96) as the sum over the six `modes', with the STASH codes: m01s02i500, m01s02i501, m01s02i502, m01s02i503, m01s02i504, m01s02i505. The column-integrated CDNC fields (i.e. CDN per m$^2$) are calculated on the fine domain by first multiplying each CDNC value (STASH code m01s38i479) by its cell height and then summing over all cells within a given model column. The cell heights are currently obtained using IRIS's `HybridHeightFactory' function, which takes orography data and the model sigma levels as input and gives the altitude bounds of each grid cell as output. However, it is planned to also implement Masaru's alternative approach of using the pressure and theta fields along with the hydrostatic equation; the method to use at execution could be chosen via an optional command line flag.\\\\
-The fine domain data is then regridded onto the coarser (N48) domain using IRIS's `regrid' function, where the coarse grid coordinates are extracted from the `ncRef' file (supplied via a command-line argument). The `Linear' regridding method is currently used. Discussion is ongoing as to whether this or the `AreaWeighted' regrdding method is the most appropriate.\\\\
-Efforts have been made to capture as many potential errors as possibe in a `nice' manner (i.e. with descriptive erorr/warning messages written to the log file). These include:
+The fine domain data is then regridded onto the coarser (N48) domain using IRIS's `regrid' function, where the coarse grid coordinates are extracted from the `ncRef' file (supplied via a command-line argument). The `Linear' regridding method is used and is currently the preferred method (over the alternative 'AreaWeighted' method) as it is believed that the UM output data represents quantities at the grid cell centres rather than a mean over the grid cell volume.\\\\
+Efforts have been made to capture as many potential errors as possible in a graceful manner (i.e. with descriptive error/warning messages written to the log file). These include:
 \begin{itemize}
 \item Checking that the paths given in the command-line arguments exist
 \item Checking that the date stamps given in the command-line arguments are in the expected format, with the start date preceding the end date.

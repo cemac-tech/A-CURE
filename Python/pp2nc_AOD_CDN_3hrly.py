@@ -9,7 +9,7 @@ Purpose: Extract and condense information from 3-hourly pp files belonging to th
          contains aerosol optical depth (AOD) at 550nm, and another set contain column-integrated
          cloud droplet number concentration (CDNC) fields for all 235 PPE members for one day
          (8 timesteps per file) on a coarsened grid (N96 down to N48)
-Usage: ./pp2nc_3hrly.py <ppRoot> <ncRoot> <ncRef> <orogFile> <startDate> <endDate>
+Usage: ./pp2nc_AOD_CDN_3hrly.py <ppRoot> <orogFile> <ncRef> <ncRoot> <startDate> <endDate>
         <ppRoot> - path (either relative to the current directory, or full) to the root directory
                    containing the pp files
         <orogFile> - path (relative or full) to ancilliary UM file containing the orgraphy data
