@@ -6,23 +6,32 @@ import os
 import iris
 import numpy as np
 import netCDF4
+import glob
+import cis
+import re
 
 #####PARAMETERS
-month='200807' #Month in format YYYYMM
+YYYYMM='200807' #Month in format YYYYMM
 ppRoot='/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps' #pp root directory
+AERONETRoot='/group_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly'
 ncRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMMDD_nc' #Output directory for pp->nc files
+mavRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_mav_nc'
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
 missing=np.nan #Missing value written to nc file if field is missing
-run_pp2nc=True
+run_pp2nc=False
 #####
 
 #####GENERATE ARRAY WITH MIDDLE PART OF FILENAME CONVENTION
 #Expected filename format under root directory is: <jobid>/<jobid>a.pbYYYYDDMM.pp
-numDaysInMon=monthrange(int(month[0:4]),int(month[4:6]))[1]
+year=int(YYYYMM[0:4])
+mon=int(YYYYMM[4:6])
+numDaysInMon=monthrange(year,mon)[1]
+monStart=dt.datetime(year,mon,1)
+monEnd=monStart+dt.timedelta(days=numDaysInMon,seconds=-1)
 fileDates=[]
 #####TEMPORARILY ONLY RUN FOR 2 DAYS RATHER THAN WHOLE MONTH:#####
 #for date in [dt.date(int(month[0:4]),int(month[4:6]),1) + dt.timedelta(n) for n in range(numDaysInMon)]:
-for date in [dt.date(int(month[0:4]),int(month[4:6]),1) + dt.timedelta(n) for n in range(2)]:
+for date in [dt.date(year,mon,1) + dt.timedelta(n) for n in range(2)]:
     #The date.strftime() functions below ensure e.g. that the day is written as '01' and not '1'
     fileDates.append('pb'+date.strftime('%Y')+date.strftime('%m')+date.strftime('%d'))
 #####
@@ -51,7 +60,7 @@ for c1 in string.ascii_lowercase[7:9]:
 if(run_pp2nc):
     for date in fileDates:
         for j,jobid in enumerate(jobids):
-            outFile=ncRoot+'/aod550_total_'+jobid+'_'+date+'.nc' #path to output nc file
+            outFile=os.path.join(ncRoot,'aod550_total_'+jobid+'_'+date+'.nc') #path to output nc file
             #Generate full PP file path
             ppFile=jobid+'a.'+date+'.pp' #specific pp file name
             ppPath=ppRoot+'/'+jobid+'/'+ppFile #specific pp file path
@@ -105,3 +114,18 @@ if(run_pp2nc):
             #close netCDF file
             ncfile.close()
 #####
+
+#####LOOP THROUGH AERONET FILES (STATIONS); USE CIS TO COLLOCATE UM DATA AND GET MONTHLY AVERAGES           
+AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
+AERONETFiles=glob.glob(AERONETFilePtn)
+for AERONETFile in AERONETFiles:
+    underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
+    station=AERONETFile[(underscores[1]+1):underscores[-2]]
+    AERONETData=cis.read_data(os.path.join(AERONETRoot,AERONETFile),"aod440")
+    for jobid in jobids:
+        UMFilePtn='aod550_total_'+jobid+'_'+YYYYMM[0:4]+YYYYMM[4:6]+'??.nc'
+        UMFiles=glob.glob(UMFilePtn)
+        UMData=cis.read_data(UMFiles,"aod440")
+        colData=UMData.collocated_onto(AERONETData,how="lin",var_name="collocated_AOD550")
+        aggData=colData.aggregate(how='moments',t=[monStart,monEnd,dt.timedelta(days=numDaysInMon)])
+        aggData.save_data(os.path.join(mavRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'_mav_nc'))
