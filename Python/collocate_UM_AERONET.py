@@ -10,12 +10,16 @@ import glob
 import cis
 import re
 
+assert "CIS_PLUGIN_HOME" in os.environ, "Environment variable CIS_PLUGIN_HOME not set"
+assert os.path.exists(os.path.join(os.getenv("CIS_PLUGIN_HOME"),"cis_plugin_AERONETv3nc.py")), "Cannot find cis_plugin_AERONETv3nc.py in CIS_PLUGIN_HOME directory"
+
 #####PARAMETERS
 YYYYMM='200807' #Month in format YYYYMM
 ppRoot='/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps' #pp root directory
-AERONETRoot='/group_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly'
+AERONETRoot='/group_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly' #AERONET root directory
 ncRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMMDD_nc' #Output directory for pp->nc files
-mavRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_mav_nc'
+colRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_nc' #Output directory for collocated nc files
+mavRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_mav_nc' #Output directory for monthly averaged nc files
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
 missing=np.nan #Missing value written to nc file if field is missing
 run_pp2nc=True
@@ -26,12 +30,11 @@ run_pp2nc=True
 year=int(YYYYMM[0:4])
 mon=int(YYYYMM[4:6])
 numDaysInMon=monthrange(year,mon)[1]
+numDaysInMon=2 ####TEMPORARY CODE
 monStart=dt.datetime(year,mon,1)
 monEnd=monStart+dt.timedelta(days=numDaysInMon,seconds=-1)
 fileDates=[]
-#####TEMPORARILY ONLY RUN FOR 2 DAYS RATHER THAN WHOLE MONTH:#####
-for date in [dt.date(int(YYYYMM[0:4]),int(YYYYMM[4:6]),1) + dt.timedelta(n) for n in range(numDaysInMon)]:
-#for date in [dt.date(year,mon,1) + dt.timedelta(n) for n in range(2)]:
+for date in [monStart + dt.timedelta(n) for n in range(numDaysInMon)]:
     #The date.strftime() functions below ensure e.g. that the day is written as '01' and not '1'
     fileDates.append('pb'+date.strftime('%Y')+date.strftime('%m')+date.strftime('%d'))
 #####
@@ -54,14 +57,15 @@ jobids.append('teafw')
 for c1 in string.ascii_lowercase[7:9]:
     for c2 in string.ascii_lowercase:
       jobids.append('teb'+c1+c2)
-####TEMPORARY CODE:
-jobids=jobids[0:2]
+jobids=jobids[0:1] ####TEMPORARY CODE
 #####
 
+for j,jobid in enumerate(jobids):
+    print('=====PROCESSING JOB '+jobid+'=====')
+    
 #####GENERATE NC FILES FROM PP FILES
-if(run_pp2nc):
-    for date in fileDates:
-        for j,jobid in enumerate(jobids):
+    if(run_pp2nc):
+        for date in fileDates:
             outFile=os.path.join(ncRoot,'aod550_total_'+jobid+'_'+date+'.nc') #path to output nc file
             #Generate full PP file path
             ppFile=jobid+'a.'+date+'.pp' #specific pp file name
@@ -82,7 +86,7 @@ if(run_pp2nc):
                 else:
                     AODcube+=modeCube
             ####Create AOD nc file:
-            print("Writing AOD fields to nc file: "+outFile)
+            print("Extracting AOD_550 from pp file and writing to nc file: "+outFile)
             ncfile = netCDF4.Dataset(outFile,mode='w',format='NETCDF4_CLASSIC')
             #Add time dimension/variable:
             tAOD = ncfile.createDimension('time',len(AODtimes))
@@ -118,23 +122,25 @@ if(run_pp2nc):
 #####
 
 #####LOOP THROUGH AERONET FILES (STATIONS); USE CIS TO COLLOCATE UM DATA AND GET MONTHLY AVERAGES           
-AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
-AERONETPaths=glob.glob(os.path.join(AERONETRoot,AERONETFilePtn))
-AERONETFiles=[os.path.basename(x) for x in AERONETPaths]
-###TEMPORARY CODE:
-AERONETFiles=AERONETFiles[0:2]
-print(AERONETFiles)
-for AERONETFile in AERONETFiles:
-    underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
-    station=AERONETFile[(underscores[1]+1):underscores[-2]]
-    print(station)
-    AERONETData=cis.read_data(os.path.join(AERONETRoot,AERONETFile),"AOD_440",product="cis")
-    for jobid in jobids:
-        print(jobid)
+    AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
+    AERONETPaths=glob.glob(os.path.join(AERONETRoot,AERONETFilePtn))
+    AERONETFiles=[os.path.basename(x) for x in AERONETPaths]
+    AERONETFiles=AERONETFiles[0:1] ###TEMPORARY CODE
+    for AERONETFile in AERONETFiles:
+        underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
+        station=AERONETFile[(underscores[1]+1):underscores[-2]]
+        print("Collocating UM data with AERONET data and calculating monthly averages for station "+station)
+        #Read in AERONET data with new plugin:
+        AERONETData=cis.read_data(os.path.join(AERONETRoot,AERONETFile),"AOD_440",product="AERONETv3nc")
+        #Subset AERONET data in time to ensure all points are within UM data time bounds:
+        AERONETsubset=AERONETData.subset(time=[monStart,monEnd])
+        #Read in relevant UM files:
         UMFilePtn='aod550_total_'+jobid+'_pb'+YYYYMM[0:4]+YYYYMM[4:6]+'??.nc'
         UMFiles=glob.glob(os.path.join(ncRoot,UMFilePtn))
-        print('UMFiles: ',UMFiles)
         UMData=cis.read_data(UMFiles,"aod550")
+        #Collocate UM data onto AERONET data:
         colData=UMData.collocated_onto(AERONETData,how="lin",var_name="collocated_AOD550",var_units="1")
+        #colData.save_data(os.path.join(colRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'.nc'))
+        #Calculate monthly average of collocated aod550:
         aggData=colData.aggregate(how='moments',t=[monStart,monEnd,dt.timedelta(days=numDaysInMon)])
         aggData.save_data(os.path.join(mavRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'_mav.nc'))
