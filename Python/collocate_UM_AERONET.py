@@ -9,6 +9,7 @@ import netCDF4
 import glob
 import cis
 import re
+import pandas as pd
 
 assert "CIS_PLUGIN_HOME" in os.environ, "Environment variable CIS_PLUGIN_HOME not set"
 assert os.path.exists(os.path.join(os.getenv("CIS_PLUGIN_HOME"),"cis_plugin_AERONETv3nc.py")), "Cannot find cis_plugin_AERONETv3nc.py in CIS_PLUGIN_HOME directory"
@@ -17,12 +18,13 @@ assert os.path.exists(os.path.join(os.getenv("CIS_PLUGIN_HOME"),"cis_plugin_AERO
 YYYYMM='200807' #Month in format YYYYMM
 ppRoot='/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps' #pp root directory
 AERONETRoot='/group_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly' #AERONET root directory
-ncRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMMDD_nc' #Output directory for pp->nc files
+UMRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMMDD_nc' #Output directory for pp->nc files
 colRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_nc' #Output directory for collocated nc files
 mavRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_mav_nc' #Output directory for monthly averaged nc files
+outRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_mav_nc' #Output directory for concatenated files
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
 missing=np.nan #Missing value written to nc file if field is missing
-run_pp2nc=True
+run_pp2nc=False
 #####
 
 #####GENERATE ARRAY WITH MIDDLE PART OF FILENAME CONVENTION
@@ -66,7 +68,7 @@ for j,jobid in enumerate(jobids):
 #####GENERATE NC FILES FROM PP FILES
     if(run_pp2nc):
         for date in fileDates:
-            outFile=os.path.join(ncRoot,'aod550_total_'+jobid+'_'+date+'.nc') #path to output nc file
+            outFile=os.path.join(UMRoot,'aod550_total_'+jobid+'_'+date+'.nc') #path to output nc file
             #Generate full PP file path
             ppFile=jobid+'a.'+date+'.pp' #specific pp file name
             ppPath=ppRoot+'/'+jobid+'/'+ppFile #specific pp file path
@@ -121,12 +123,16 @@ for j,jobid in enumerate(jobids):
             ncfile.close()
 #####
 
-#####LOOP THROUGH AERONET FILES (STATIONS); USE CIS TO COLLOCATE UM DATA AND GET MONTHLY AVERAGES           
+#####LOOP THROUGH AERONET FILES (STATIONS); USE CIS TO SUBSET AERONET DATA, COLLOCATE UM DATA AND GET MONTHLY AVERAGES           
     AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
     AERONETPaths=glob.glob(os.path.join(AERONETRoot,AERONETFilePtn))
     AERONETFiles=[os.path.basename(x) for x in AERONETPaths]
-    AERONETFiles=AERONETFiles[0:1] ###TEMPORARY CODE
-    for AERONETFile in AERONETFiles:
+    AERONETFiles=AERONETFiles[0:10] ###TEMPORARY CODE
+    monAveDF=pd.DataFrame(missing,index=range(0,len(AERONETFiles)),columns=['stn','lat','lon','ave','std','num'])
+    monAveDF['stn'] = monAveDF['stn'].astype(str)
+    monAveDF['num'] = 0
+    monAveDF['num'] = monAveDF['num'].astype(int)
+    for i,AERONETFile in enumerate(AERONETFiles):
         underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
         station=AERONETFile[(underscores[1]+1):underscores[-2]]
         print("Collocating UM data with AERONET data and calculating monthly averages for station "+station)
@@ -136,11 +142,64 @@ for j,jobid in enumerate(jobids):
         AERONETsubset=AERONETData.subset(time=[monStart,monEnd])
         #Read in relevant UM files:
         UMFilePtn='aod550_total_'+jobid+'_pb'+YYYYMM[0:4]+YYYYMM[4:6]+'??.nc'
-        UMFiles=glob.glob(os.path.join(ncRoot,UMFilePtn))
+        UMFiles=glob.glob(os.path.join(UMRoot,UMFilePtn))
         UMData=cis.read_data(UMFiles,"aod550")
         #Collocate UM data onto AERONET data:
         colData=UMData.collocated_onto(AERONETData,how="lin",var_name="collocated_AOD550",var_units="1")
         #colData.save_data(os.path.join(colRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'.nc'))
         #Calculate monthly average of collocated aod550:
         aggData=colData.aggregate(how='moments',t=[monStart,monEnd,dt.timedelta(days=numDaysInMon)])
-        aggData.save_data(os.path.join(mavRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'_mav.nc'))
+        #aggData.save_data(os.path.join(mavRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'_mav.nc'))
+        monAveDF.at[i,'stn']=station
+        monAveDF.at[i,'lat']=aggData[0].get_all_points()[0].latitude
+        monAveDF.at[i,'lon']=aggData[0].get_all_points()[0].longitude
+        monAveDF.at[i,'ave']=aggData[0].get_all_points()[0].val[0]
+        monAveDF.at[i,'std']=aggData[1].get_all_points()[0].val[0]
+        monAveDF.at[i,'num']=aggData[2].get_all_points()[0].val[0]
+#####SAVE ALL STATION MONTHLY AVERAGES TOGETHER INTO ONE ARRAY
+    print(monAveDF)
+
+######SAVE ARRAY TO UNGRIDDED NC FILE
+#    ncfilename = os.path.join(outRoot,'aod550_total_'+jobid+'_pb'+YYYYMM+'_mav.nc')
+#    ncfile = netCDF4.Dataset(ncfilename,mode='w',format='NETCDF4_CLASSIC')
+#    #Add station dimension/variable. Note that multi-character strings must be handled using stringtochar:
+#    stn_dim = ncfile.createDimension('station',len(stations))
+#    nchars=len(max(stations,key=len))
+#    nchar_dim = ncfile.createDimension('nchar',nchars)
+#    str_out = netCDF4.stringtochar(np.array(stations,'S'+str(nchars)))
+#    stn_out = ncfile.createVariable('station', 'S1', ('station','nchar'))
+#    stn_out[:] = str_out
+#    stn_out.long_name = "AERONET station name"
+#    stn_out.units = "none"
+#
+#    #Add lat/lon dimensions/variables:
+#    lon_dim = ncfile.createDimension('longitude', len(lons))
+#    lat_dim = ncfile.createDimension('latitude', len(lats))
+#    lon_out = ncfile.createVariable('longitude', np.float64, ('longitude'))
+#    lat_out = ncfile.createVariable('latitude', np.float64, ('latitude'))
+#    lon_out[:] = lons
+#    lat_out[:] = lats
+#    lon_out.long_name="longitude"
+#    lat_out.long_name="latitude"
+#    lon_out.standard_name="longitude"
+#    lat_out.standard_name="latitude"
+#    lon_out.units="degrees_east"
+#    lat_out.units="degrees_north"
+#    #Add job dimension/variable. Note that multi-character strings must be handled using stringtochar:
+#    job_dim = ncfile.createDimension('job',len(jobids))
+#    nchar_dim = ncfile.createDimension('nchar',5)
+#    str_out = netCDF4.stringtochar(np.array(jobids,'S5'))
+#    job_out = ncfile.createVariable('job', 'S1', ('job','nchar'))
+#    job_out[:,:] = str_out
+#    job_out.long_name = "job index of UKCA26AER PPE member"
+#    job_out.units = "none"
+#    #Add AOD550 variable:
+#    aod_out = ncfile.createVariable('aod550', np.float64, ('time','latitude','longitude','job'),fill_value=missing)
+#    aod_out[:,:,:,:] = AOD_all
+#    aod_out.long_name="Aerosol optical depth at 550nm"
+#    aod_out.units = "none"
+#    aod_out.stash_codes="summation of m01s02i500, m01s02i501, m01s02i502, m01s02i503, m01s02i504, m01s02i505"
+#    aod_out.stash_names="AITKENMODESOLUBLEOPTDEPNONADV, ACCUMMODESOLUBLEOPTDEPNONADV, COARSEMODESOLUBLEOPTDEPNONADV, \
+#    AITKENMODEINSOLOPTDEPNONADV, ACCUMMODEINSOLOPTDEPNONADV, COARSEMODEINSOLOPTDEPNONADV"
+#    #close netCDF file
+#    ncfile.close()
