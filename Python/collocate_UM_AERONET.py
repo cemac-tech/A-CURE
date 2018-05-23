@@ -21,10 +21,10 @@ AERONETRoot='/group_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Mon
 UMRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMMDD_nc' #Output directory for pp->nc files
 colRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_nc' #Output directory for collocated nc files
 mavRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_station_mav_nc' #Output directory for monthly averaged nc files
-outRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_mav_nc' #Output directory for concatenated files
+outRoot='/home/users/earjjo/GASSP_WS/aod550_total_jobid_pbYYYYMM_mav_nc' #Output directory for nc files over all stations
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
 missing=np.nan #Missing value written to nc file if field is missing
-run_pp2nc=True
+run_pp2nc=True #Do we need to generate the nc files from the raw UM pp files?
 #####
 
 #####GENERATE ARRAY WITH MIDDLE PART OF FILENAME CONVENTION
@@ -60,6 +60,18 @@ for c1 in string.ascii_lowercase[7:9]:
     for c2 in string.ascii_lowercase:
       jobids.append('teb'+c1+c2)
 jobids=jobids[0:1] ####TEMPORARY CODE
+#####
+
+#####LOOP THROUGH AERONET FILES AND GET STATION NAMES           
+AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
+AERONETPaths=glob.glob(os.path.join(AERONETRoot,AERONETFilePtn))
+AERONETFiles=[os.path.basename(x) for x in AERONETPaths]
+AERONETFiles=AERONETFiles[0:10] ###TEMPORARY CODE
+stations=[]
+for AERONETFile in AERONETFiles:
+    underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
+    station=AERONETFile[(underscores[1]+1):underscores[-2]]
+    stations.append(station)
 #####
 
 for j,jobid in enumerate(jobids):
@@ -125,21 +137,14 @@ for j,jobid in enumerate(jobids):
             ncfile.close()
 #####
 
-#####LOOP THROUGH AERONET FILES (STATIONS); USE CIS TO SUBSET AERONET DATA, COLLOCATE UM DATA AND GET MONTHLY AVERAGES           
-    AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
-    AERONETPaths=glob.glob(os.path.join(AERONETRoot,AERONETFilePtn))
-    AERONETFiles=[os.path.basename(x) for x in AERONETPaths]
-    #AERONETFiles=AERONETFiles[0:10] ###TEMPORARY CODE
-    stations=[]
+##### LOOP THROUGH AERONET FILES (STATIONS), USE CIS TO SUBSET AERONET DATA, 
+##### COLLOCATE WITH UM DATA AND GET MONTHLY AVERAGES, AND SAVE TO A PANDAS DF      
     monAveDF=pd.DataFrame(missing,index=range(0,len(AERONETFiles)),columns=['stn','lat','lon','ave','std','num'])
     monAveDF['stn'] = monAveDF['stn'].astype(str)
     monAveDF['num'] = 0
     monAveDF['num'] = monAveDF['num'].astype(int)
     for i,AERONETFile in enumerate(AERONETFiles):
-        underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
-        station=AERONETFile[(underscores[1]+1):underscores[-2]]
-        stations.append(station)
-        print("Collocating UM onto AERONET data and taking monthly average for station: "+station)
+        print("Collocating UM onto AERONET data and taking monthly average for station: "+stations[i])
         #Read in AERONET data with new plugin:
         AERONETData=cis.read_data(os.path.join(AERONETRoot,AERONETFile),"AOD_440",product="AERONETv3nc")
         #Subset AERONET data in time to ensure all points are within UM data time bounds:
