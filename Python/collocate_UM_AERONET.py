@@ -199,6 +199,8 @@ for j,jobid in enumerate(jobids):
     monAveDF['stn'] = monAveDF['stn'].astype(str)
     monAveDF['num'] = 0
     monAveDF['num'] = monAveDF['num'].astype(int)
+    #Read UM file back in using cis:
+    UMData=cis.read_data(UMPath,"aod550")
     for i,AERONETFile in enumerate(AERONETFiles):
         flog=open(outDir+'/logfile.log','a')
         flog.write("Collocating UM onto AERONET data and taking monthly average for station: "+stations[i]+'\n')
@@ -208,8 +210,6 @@ for j,jobid in enumerate(jobids):
         #Subset AERONET data in time to ensure all points are within UM data time bounds:
         AERONETsubset=AERONETData.subset(time=[monStart,monEnd])
         #AERONETsubset.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'.nc'))
-        #Read in relevant UM file:
-        UMData=cis.read_data(UMPath,"aod550")
         #Collocate UM data onto AERONET data:
         colData=UMData.collocated_onto(AERONETData,how="lin",var_name="collocated_AOD550",var_units="1")
         #colData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'_col.nc'))
