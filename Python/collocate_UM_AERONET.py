@@ -1,4 +1,20 @@
 #!/usr/bin/env python2.7
+"""
+Script name: collocate_UM_AERONET.py
+Author: James O'Neill. Based on very helpful scripts provided by Masaru Yoshioka
+Date: May 2018
+Purpose: For a given month, use cis to collocate AOD550 UM data from the 3-hourly UKCA26AER PPE set with
+         AERONET v3 data
+Usage: ./collocate_UM_AERONET.py 200708 <mon> <ppRoot> <AERONETRoot> <outDir>
+        <mon> - Month to be processed in the form YYYYMM
+        <ppRoot> - absolute/relative path to root directory containing the UM 
+            pp files (see user docs for expected file naming conventions under this root directory)
+        <AERONETRoot> - absolute/relative path to root directory containing the (preprocessed) AERONET v3 
+            files (see user docs for expected format and file naming conventions under this root directory)
+        <outDir> - absolute/relative path to desired output directory
+Output: <outDir>/UM_nc_files/aod550_total_<jobid>_<YYYYMMDD>.nc - extracted AOD550 from pp files in gridded nc format
+        <outDir>/col_mav_files/aod550_total_<jobid>_pb<YYYYMM>_col_mav.nc - collocated monthly-averaged UM data in ungridded nc format
+"""
 import string
 from calendar import monthrange
 import datetime as dt
@@ -10,16 +26,43 @@ import glob
 import cis
 import re
 import pandas as pd
+import argparse
 
+#####READ IN COMMAND LINE ARGUMENTS
+parser = argparse.ArgumentParser(description="""
+Purpose: For a given month, use cis to collocate AOD550 UM data from the 3-hourly UKCA26AER PPE set with
+AERONET v3 data
+""",
+epilog="Example of use: ./collocate_UM_AERONET.py 200708 ./ppFiles ./AERONETFiles ./output")
+parser.add_argument("month",help="Month to be processed in the form YYYYMM",type=str)
+parser.add_argument("ppRoot",help="absolute/relative path to root directory containing the UM pp files (see user docs for expected file naming conventions under this root directory)",type=str)
+parser.add_argument("AERONETRoot",help="absolute/relative path to root directory containing the (preprocessed) AERONET v3 files (see user docs for expected format and file naming conventions under this root directory)",type=str)
+parser.add_argument("outDir",help="absolute/relative path to desired output directory",type=str) 
+args = parser.parse_args()
+YYYYMM=args.month
+ppRoot=args.ppRoot
+AERONETRoot=args.AERONETRoot
+outDir=args.outDir
+#####
+
+#####VALIDITY CHECKS
+assert len(YYYYMM)==6, "month in wrong format, should be YYYYMM"
+try:
+    int(YYYYMM)
+except:
+    print("month in wrong format, should be YYYYMM as numbers")
+assert os.path.exists(ppRoot), "ppRoot directory does not exist"
+assert os.path.exists(AERONETRoot), "AERONETRoot directory does not exist"
+assert os.path.exists(outDir), "outDir directory does not exist"
+if not os.path.exists(os.path.join(outDir,"UM_nc_files")):
+    os.makedirs(os.path.join(outDir,"UM_nc_files"))
+if not os.path.exists(os.path.join(outDir,"col_mav_files")):
+    os.makedirs(os.path.join(outDir,"col_mav_files"))
 assert "CIS_PLUGIN_HOME" in os.environ, "Environment variable CIS_PLUGIN_HOME not set"
 assert os.path.exists(os.path.join(os.getenv("CIS_PLUGIN_HOME"),"cis_plugin_AERONETv3nc.py")), "Cannot find cis_plugin_AERONETv3nc.py in CIS_PLUGIN_HOME directory"
+#####
 
 #####PARAMETERS
-YYYYMM='200807' #Month in format YYYYMM
-AERONETRoot='/group_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly' #AERONET root directory
-ppRoot='/group_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps' #pp root directory
-UMRoot='/home/users/earjjo/GASSP_WS/collocate_UM_AERONET/UMNC' #Output directory for pp->nc files
-outDir='/home/users/earjjo/GASSP_WS/collocate_UM_AERONET/OUTNC' #Output directory
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
 missing=np.nan #Missing value written to nc file if field is missing
 run_pp2nc=True #Do we need to generate the nc files from the raw UM pp files?
@@ -30,7 +73,7 @@ run_pp2nc=True #Do we need to generate the nc files from the raw UM pp files?
 year=int(YYYYMM[0:4])
 mon=int(YYYYMM[4:6])
 numDaysInMon=monthrange(year,mon)[1]
-#numDaysInMon=2 ####TEMPORARY CODE
+#numDaysInMon=1 ####TEMPORARY CODE
 monStart=dt.datetime(year,mon,1)
 monEnd=monStart+dt.timedelta(days=numDaysInMon,seconds=-1)
 fileDates=[]
@@ -57,14 +100,14 @@ jobids.append('teafw')
 for c1 in string.ascii_lowercase[7:9]:
     for c2 in string.ascii_lowercase:
       jobids.append('teb'+c1+c2)
-jobids=jobids[0:2] ####TEMPORARY CODE
+jobids=jobids[0:1] ####TEMPORARY CODE
 #####
 
 #####LOOP THROUGH AERONET FILES AND GET STATION NAMES           
 AERONETFilePtn="AOD_440_*_"+YYYYMM[0:4]+"-"+YYYYMM[4:6]+"_v3.nc"
 AERONETPaths=glob.glob(os.path.join(AERONETRoot,AERONETFilePtn))
 AERONETFiles=[os.path.basename(x) for x in AERONETPaths]
-AERONETFiles=AERONETFiles[0:10] ###TEMPORARY CODE
+#AERONETFiles=AERONETFiles[0:1] ###TEMPORARY CODE
 stations=[]
 for AERONETFile in AERONETFiles:
     underscores=[m.start() for m in re.finditer(r"_",AERONETFile)]
@@ -82,7 +125,7 @@ for j,jobid in enumerate(jobids):
     if(run_pp2nc):
         for date in fileDates:
             UMFile='aod550_total_'+jobid+'_'+date+'.nc'
-            UMPath=os.path.join(UMRoot,UMFile) #path to output nc file
+            UMPath=os.path.join(outDir,"UM_nc_files",UMFile) #path to output nc file
             #Generate full PP file path
             ppFile=jobid+'a.'+date+'.pp' #specific pp file name
             ppPath=ppRoot+'/'+jobid+'/'+ppFile #specific pp file path
@@ -160,14 +203,14 @@ for j,jobid in enumerate(jobids):
         AERONETsubset=AERONETData.subset(time=[monStart,monEnd])
         #Read in relevant UM files:
         UMFilePtn='aod550_total_'+jobid+'_pb'+YYYYMM[0:4]+YYYYMM[4:6]+'??.nc'
-        UMFiles=glob.glob(os.path.join(UMRoot,UMFilePtn))
+        UMFiles=glob.glob(os.path.join(outDir,"UM_nc_files",UMFilePtn))
         UMData=cis.read_data(UMFiles,"aod550")
         #Collocate UM data onto AERONET data:
         colData=UMData.collocated_onto(AERONETData,how="lin",var_name="collocated_AOD550",var_units="1")
-        #colData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'.nc'))
+        #colData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'.nc'))
         #Calculate monthly average of collocated aod550:
         aggData=colData.aggregate(how='moments',t=[monStart,monEnd,dt.timedelta(days=numDaysInMon)])
-        #aggData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+station+'_mav.nc'))
+        #aggData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'_mav.nc'))
         #Add monthly average to the pandas DF:
         monAveDF.at[i,'stn']=station
         monAveDF.at[i,'lat']=aggData[0].get_all_points()[0].latitude
@@ -177,8 +220,8 @@ for j,jobid in enumerate(jobids):
         monAveDF.at[i,'num']=aggData[2].get_all_points()[0].val[0]
 
 #####SAVE PANDAS DF TO UNGRIDDED NC FILE
-    outFile='aod550_total_'+jobid+'_pb'+YYYYMM+'_mav.nc'
-    outPath = os.path.join(outDir,outFile)
+    outFile='aod550_total_'+jobid+'_pb'+YYYYMM+'_col_mav.nc'
+    outPath = os.path.join(outDir,"col_mav_files",outFile)
     ncfile = netCDF4.Dataset(outPath,mode='w',format='NETCDF4_CLASSIC')
     flog=open(outDir+'/logfile.log','a')
     flog.write("Writing data for all stations to nc file: "+outFile+'\n')
