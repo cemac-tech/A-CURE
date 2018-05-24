@@ -73,7 +73,7 @@ run_pp2nc=True #Do we need to generate the nc files from the raw UM pp files?
 year=int(YYYYMM[0:4])
 mon=int(YYYYMM[4:6])
 numDaysInMon=monthrange(year,mon)[1]
-#numDaysInMon=1 ####TEMPORARY CODE
+#numDaysInMon=2 ####TEMPORARY CODE
 monStart=dt.datetime(year,mon,1)
 monEnd=monStart+dt.timedelta(days=numDaysInMon,seconds=-1)
 fileDates=[]
@@ -100,7 +100,7 @@ jobids.append('teafw')
 for c1 in string.ascii_lowercase[7:9]:
     for c2 in string.ascii_lowercase:
       jobids.append('teb'+c1+c2)
-jobids=jobids[0:1] ####TEMPORARY CODE
+#jobids=jobids[0:1] ####TEMPORARY CODE
 #####
 
 #####LOOP THROUGH AERONET FILES AND GET STATION NAMES           
@@ -123,9 +123,7 @@ for j,jobid in enumerate(jobids):
     flog.close
 #####GENERATE NC FILES FROM PP FILES
     if(run_pp2nc):
-        for date in fileDates:
-            UMFile='aod550_total_'+jobid+'_'+date+'.nc'
-            UMPath=os.path.join(outDir,"UM_nc_files",UMFile) #path to output nc file
+        for d,date in enumerate(fileDates):
             #Generate full PP file path
             ppFile=jobid+'a.'+date+'.pp' #specific pp file name
             ppPath=ppRoot+'/'+jobid+'/'+ppFile #specific pp file path
@@ -139,52 +137,60 @@ for j,jobid in enumerate(jobids):
             flog=open(outDir+'/logfile.log','a')
             flog.write("Extracting AOD_550 from pp file: "+ppFile+'\n')
             flog.close
-            AODcube=0
             for s,stashid in enumerate(stash_AOD):
                 modeCube=iris.load_cube(ppPath,iris.AttributeConstraint(STASH=stashid))
                 if s==0:
                     AODcube=modeCube
-                    AODtimes=modeCube.coord('time').points
-                    AODlats=modeCube.coord('latitude').points
-                    AODlons=modeCube.coord('longitude').points
                 else:
                     AODcube+=modeCube
-            ####Create AOD nc file:
-            flog=open(outDir+'/logfile.log','a')
-            flog.write("Writing AOD_550 to nc file: "+UMFile+'\n')
-            flog.close
-            ncfile = netCDF4.Dataset(UMPath,mode='w',format='NETCDF4_CLASSIC')
-            #Add time dimension/variable:
-            tAOD = ncfile.createDimension('time',len(AODtimes))
-            tAOD_out = ncfile.createVariable('time', np.float64, ('time'))
-            tAOD_out[:] = AODtimes
-            tAOD_out.long_name = "time"
-            tAOD_out.standard_name = "time"
-            tAOD_out.units = "hours since 1970-01-01 00:00:00"
-            tAOD_out.calendar = "gregorian"
-            #Add lat/lon dimensions/variables:
-            lon_dim = ncfile.createDimension('longitude', len(AODlons))
-            lat_dim = ncfile.createDimension('latitude', len(AODlats))
-            lon_out = ncfile.createVariable('longitude', np.float64, ('longitude'))
-            lat_out = ncfile.createVariable('latitude', np.float64, ('latitude'))
-            lon_out[:] = AODlons
-            lat_out[:] = AODlats
-            lon_out.long_name="longitude"
-            lat_out.long_name="latitude"
-            lon_out.standard_name="longitude"
-            lat_out.standard_name="latitude"
-            lon_out.units="degrees_east"
-            lat_out.units="degrees_north"
-            #Add AOD550 variable:
-            aod_out = ncfile.createVariable('aod550', np.float64, ('time','latitude','longitude'),fill_value=missing)
-            aod_out[:,:,:] = AODcube.data
-            aod_out.long_name="Aerosol optical depth at 550nm"
-            aod_out.units = "1"
-            aod_out.stash_codes="summation of m01s02i500, m01s02i501, m01s02i502, m01s02i503, m01s02i504, m01s02i505"
-            aod_out.stash_names="AITKENMODESOLUBLEOPTDEPNONADV, ACCUMMODESOLUBLEOPTDEPNONADV, COARSEMODESOLUBLEOPTDEPNONADV, \
-            AITKENMODEINSOLOPTDEPNONADV, ACCUMMODEINSOLOPTDEPNONADV, COARSEMODEINSOLOPTDEPNONADV"
-            #close netCDF file
-            ncfile.close()
+            #Concatenate cube for this day with the previous days
+            if d==0:
+                AODcubeConcat=AODcube
+            else:
+                cubeList= iris.cube.CubeList([AODcubeConcat,AODcube])
+                AODcubeConcat=cubeList.concatenate_cube()
+                
+        AODtimes=AODcubeConcat.coord('time').points
+        AODlats=AODcubeConcat.coord('latitude').points
+        AODlons=AODcubeConcat.coord('longitude').points
+        UMFile='aod550_total_'+jobid+'_'+YYYYMM+'.nc'
+        UMPath=os.path.join(outDir,"UM_nc_files",UMFile) #path to output nc file
+        ####Create AOD nc file:
+        flog=open(outDir+'/logfile.log','a')
+        flog.write("Writing AOD_550 to nc file: "+UMFile+'\n')
+        flog.close
+        ncfile = netCDF4.Dataset(UMPath,mode='w',format='NETCDF4_CLASSIC')
+        #Add time dimension/variable:
+        tAOD = ncfile.createDimension('time',len(AODtimes))
+        tAOD_out = ncfile.createVariable('time', np.float64, ('time'))
+        tAOD_out[:] = AODtimes
+        tAOD_out.long_name = "time"
+        tAOD_out.standard_name = "time"
+        tAOD_out.units = "hours since 1970-01-01 00:00:00"
+        tAOD_out.calendar = "gregorian"
+        #Add lat/lon dimensions/variables:
+        lon_dim = ncfile.createDimension('longitude', len(AODlons))
+        lat_dim = ncfile.createDimension('latitude', len(AODlats))
+        lon_out = ncfile.createVariable('longitude', np.float64, ('longitude'))
+        lat_out = ncfile.createVariable('latitude', np.float64, ('latitude'))
+        lon_out[:] = AODlons
+        lat_out[:] = AODlats
+        lon_out.long_name="longitude"
+        lat_out.long_name="latitude"
+        lon_out.standard_name="longitude"
+        lat_out.standard_name="latitude"
+        lon_out.units="degrees_east"
+        lat_out.units="degrees_north"
+        #Add AOD550 variable:
+        aod_out = ncfile.createVariable('aod550', np.float64, ('time','latitude','longitude'),fill_value=missing)
+        aod_out[:,:,:] = AODcubeConcat.data
+        aod_out.long_name="Aerosol optical depth at 550nm"
+        aod_out.units = "1"
+        aod_out.stash_codes="summation of m01s02i500, m01s02i501, m01s02i502, m01s02i503, m01s02i504, m01s02i505"
+        aod_out.stash_names="AITKENMODESOLUBLEOPTDEPNONADV, ACCUMMODESOLUBLEOPTDEPNONADV, COARSEMODESOLUBLEOPTDEPNONADV, \
+        AITKENMODEINSOLOPTDEPNONADV, ACCUMMODEINSOLOPTDEPNONADV, COARSEMODEINSOLOPTDEPNONADV"
+        #close netCDF file
+        ncfile.close()
 #####
 
 ##### LOOP THROUGH AERONET FILES (STATIONS), USE CIS TO SUBSET AERONET DATA, 
@@ -201,18 +207,17 @@ for j,jobid in enumerate(jobids):
         AERONETData=cis.read_data(os.path.join(AERONETRoot,AERONETFile),"AOD_440",product="AERONETv3nc")
         #Subset AERONET data in time to ensure all points are within UM data time bounds:
         AERONETsubset=AERONETData.subset(time=[monStart,monEnd])
-        #Read in relevant UM files:
-        UMFilePtn='aod550_total_'+jobid+'_pb'+YYYYMM[0:4]+YYYYMM[4:6]+'??.nc'
-        UMFiles=glob.glob(os.path.join(outDir,"UM_nc_files",UMFilePtn))
-        UMData=cis.read_data(UMFiles,"aod550")
+        #AERONETsubset.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'.nc'))
+        #Read in relevant UM file:
+        UMData=cis.read_data(UMPath,"aod550")
         #Collocate UM data onto AERONET data:
         colData=UMData.collocated_onto(AERONETData,how="lin",var_name="collocated_AOD550",var_units="1")
-        #colData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'.nc'))
+        #colData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'_col.nc'))
         #Calculate monthly average of collocated aod550:
         aggData=colData.aggregate(how='moments',t=[monStart,monEnd,dt.timedelta(days=numDaysInMon)])
-        #aggData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'_mav.nc'))
+        #aggData.save_data(os.path.join(outDir,'aod550_total_'+jobid+'_pb'+YYYYMM+'_'+stations[i]+'_col_mav.nc'))
         #Add monthly average to the pandas DF:
-        monAveDF.at[i,'stn']=station
+        monAveDF.at[i,'stn']=stations[i]
         monAveDF.at[i,'lat']=aggData[0].get_all_points()[0].latitude
         monAveDF.at[i,'lon']=aggData[0].get_all_points()[0].longitude
         monAveDF.at[i,'ave']=aggData[0].get_all_points()[0].val[0]
@@ -249,10 +254,18 @@ for j,jobid in enumerate(jobids):
     #Add AOD550 variable:
     aod_out = ncfile.createVariable('aod550', np.float64, ('station'),fill_value=missing)
     aod_out[:] =  monAveDF.loc[:,'ave'].values
-    aod_out.long_name="Collocated and monthly-averaged aerosol optical depth at 550nm"
+    aod_out.long_name="UM collocated and monthly-averaged aerosol optical depth at 550nm"
     aod_out.units = "1"
     aod_out.stash_codes="summation of m01s02i500, m01s02i501, m01s02i502, m01s02i503, m01s02i504, m01s02i505"
     aod_out.stash_names="AITKENMODESOLUBLEOPTDEPNONADV, ACCUMMODESOLUBLEOPTDEPNONADV, COARSEMODESOLUBLEOPTDEPNONADV, \
     AITKENMODEINSOLOPTDEPNONADV, ACCUMMODEINSOLOPTDEPNONADV, COARSEMODEINSOLOPTDEPNONADV"
+    #Add AOD550 standard deviation variable:
+    std_out = ncfile.createVariable('aod550_std_dev', np.float64, ('station'),fill_value=missing)
+    std_out[:] =  monAveDF.loc[:,'std'].values
+    std_out.long_name="Standard deviation in UM collocated and monthly-averaged aod550 values"
+    #Add AOD550 num pts variable:
+    std_out = ncfile.createVariable('aod550_num_pts', np.float64, ('station'),fill_value=missing)
+    std_out[:] =  monAveDF.loc[:,'num'].values
+    std_out.long_name="Number of points used in the calculation of UM collocated and monthly-averaged aod550 values"
     #close netCDF file
     ncfile.close()
