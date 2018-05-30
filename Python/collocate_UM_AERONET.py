@@ -12,7 +12,7 @@ Usage: ./collocate_UM_AERONET.py 200708 <mon> <ppRoot> <AERONETRoot> <outDir>
         <AERONETRoot> - absolute/relative path to root directory containing the (preprocessed) AERONET v3 
             files (see user docs for expected format and file naming conventions under this root directory)
         <outDir> - absolute/relative path to desired output directory
-Output: <outDir>/UM_nc_files/aod550_total_<jobid>_<YYYYMMDD>.nc - extracted AOD550 from pp files in gridded nc format
+Output: <outDir>/UM_nc_files/aod550_total_<jobid>_<YYYYMM>.nc - extracted AOD550 from pp files in gridded nc format
         <outDir>/col_mav_files/aod550_total_<jobid>_pb<YYYYMM>_col_mav.nc - collocated monthly-averaged UM data in ungridded nc format
 """
 import string
