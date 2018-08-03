@@ -15,17 +15,8 @@ Usage: ./collocate_UM_AERONET.py 200708 <mon> <ppRoot> <AERONETRoot> <outDir>
 Output: <outDir>/UM_nc_files/aod550_total_<jobid>_<YYYYMM>.nc - extracted AOD550 from pp files in gridded nc format
         <outDir>/col_mav_files/aod550_total_<jobid>_pb<YYYYMM>_col_mav.nc - collocated monthly-averaged UM data in ungridded nc format
 """
-import string
-from calendar import monthrange
-import datetime as dt
+
 import os
-import iris
-import numpy as np
-import netCDF4
-import glob
-import cis
-import re
-import pandas as pd
 import argparse
 
 #####READ IN COMMAND LINE ARGUMENTS
@@ -61,6 +52,17 @@ if not os.path.exists(os.path.join(outDir,"col_mav_files")):
 assert "CIS_PLUGIN_HOME" in os.environ, "Environment variable CIS_PLUGIN_HOME not set"
 assert os.path.exists(os.path.join(os.getenv("CIS_PLUGIN_HOME"),"cis_plugin_AERONETv3nc.py")), "Cannot find cis_plugin_AERONETv3nc.py in CIS_PLUGIN_HOME directory"
 #####
+
+import string
+from calendar import monthrange
+import datetime as dt
+import iris
+import numpy as np
+import netCDF4
+import glob
+import cis
+import re
+import pandas as pd
 
 #####PARAMETERS
 stash_AOD = ['m01s02i500','m01s02i501','m01s02i502','m01s02i503','m01s02i504','m01s02i505'] #STASH codes for 6 'modes' in pp files. AOD_550 is sum over all these modes
