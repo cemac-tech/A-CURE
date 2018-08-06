@@ -126,8 +126,7 @@ The main root directory `ppRoot' is provided as a command line argument.\\\\
 
 \subsubsection{Purpose}
 
-For a given month, use cis to collocate AOD550 UM data from the 3-hourly UKCA26AER PPE set with
-         AERONET v3 data.
+For a given month, use cis to collocate AOD550 UM data from the 3-hourly UKCA26AER PPE set with AERONET v3 data (all stations) and take monthly averages.
 
 \subsubsection{Usage}
 The script can be run from the command line as follows:\\
@@ -174,11 +173,15 @@ A log file (`\texttt{logfile.log}') is also generated, which can be used to keep
 \subsubsection{Further details}
 The script expects the input pp files to have the following directory structure/filename convention:\\
 \tab \texttt{<ppRoot>/<jobid>/<jobid>a.pb<YYYYDDMM>.pp}\\
-where the main root directory `ppRoot' is provided as a command line argument. The six `mode' fields within these pp files that are summed to give total AOD550 are expected to have stash IDs m01s02i500 to m01s02i505, and it must be possible to concatenate these summed fields (in time) over the entire month using iris's concatenate\_cube function, i.e. each file should have the same dimensions for latitude and longitude.\\
+where the main root directory `ppRoot' is provided as a command line argument. Presently, the relevant pp files reside on JASMIN in the following directory (i.e. `ppRoot' can be set to this):\\
+\tab \texttt{/group\_workspaces/jasmin2/ukca/vol1/myoshioka/um/Dumps/}.\\
+The six `mode' fields within these pp files that are summed to give total AOD550 are expected to have stash IDs m01s02i500 to m01s02i505, and it must be possible to concatenate these summed fields (in time) over the entire month using iris's concatenate\_cube function, i.e. each file should have the same dimensions for latitude and longitude.\\
 
-\noindent The processed AERONET files are expected to all be be within the \texttt{AERONETRoot} directory and have the following naming convention:\\
+\noindent The processed AERONET files are expected to have the following naming convention:\\
 \tab \texttt{<AERONETRoot>/AOD\_440\_<station\_name>\_<YYYY>-<MM>\_v3.nc}\\
-\noindent Each file is expected to contain ungridded netCDF data with a single dimension (typically called `obs') with (at-least) the following variables included and sized on that dimension: latitude, longitude, time, AOD\_440. Note that since there is one file per station, the latitudes and longitudes will all be the same repeated value. The time variable is expected to be in units of "days since 1990-01-01 00:00:00" on a Gregorian calendar. Masaru has created files in this format from the original AERONET v3 dataset (one large file over all stations/times/variables). These files currently reside on JASMIN in the following directory: \texttt{/group\_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly/}.\\
+where the main root directory `AERONETRoot' is provided as a command line argument. Presently, the relevant AERONET files reside on JASMIN in the following directory (i.e. `AERONETRoot' can be set to this):\\
+\tab \texttt{/group\_workspaces/jasmin2/crescendo/Data/AERONET/AOT/ver3/LEV20/Monthly/}.\\
+Each file is expected to contain ungridded netCDF data with a single dimension (typically called `obs') with (at-least) the following variables included and sized on that dimension: latitude, longitude, time, AOD\_440. Note that since there is one file per station, the latitudes and longitudes will all be the same repeated value. The time variable is expected to be in units of "days since 1990-01-01 00:00:00" on a Gregorian calendar. Masaru has created files in this format from the original AERONET v3 dataset (one large file over all stations/times/variables).\\
 
 \noindent The main body of work in this script is performed using cis functions. The cis Python library (API) has been used, rather than the command-line utilities, so that multiple operations can be performed in one single script and without having to write to disk in between commands. The specific cis functions used are as  follows:
 \begin{itemize}

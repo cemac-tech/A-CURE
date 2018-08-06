@@ -4,7 +4,7 @@ Script name: collocate_UM_AERONET.py
 Author: James O'Neill. Based on very helpful scripts provided by Masaru Yoshioka
 Date: May 2018
 Purpose: For a given month, use cis to collocate AOD550 UM data from the 3-hourly UKCA26AER PPE set with
-         AERONET v3 data
+         AERONET v3 data (all stations) and take monthly averages
 Usage: ./collocate_UM_AERONET.py 200708 <mon> <ppRoot> <AERONETRoot> <outDir>
         <mon> - Month to be processed in the form YYYYMM
         <ppRoot> - absolute/relative path to root directory containing the UM 
