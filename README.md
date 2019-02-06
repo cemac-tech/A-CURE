@@ -1,6 +1,6 @@
 # A-CURE
 
-The A-CURE project seeks to investigate the perturbation of various parameters and how these perturbations affct the running of the UM/ESM
+The A-CURE project seeks to investigate the perturbation of various parameters and how these perturbations affect the running of the UM/ESM
 
 ## Deliverable
 
