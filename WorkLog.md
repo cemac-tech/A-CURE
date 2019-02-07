@@ -32,3 +32,5 @@ This enables the modified meta data to be used. The current states of the rose s
 ### The Ensemble Rose Suite
 
 Work will continue this afternoon on understanding the ensemble rose suite made by Dave Sexton (u-bf163). One quesation which needs answering is in what way do the required ensemble perturbations differ from those used by Dave Sexton?
+
+The Ensembles seem to be controlled through modification of the suite.rc file. This sets up cylc cycles with different ensemble members in each. This is an idea to investigate further.
