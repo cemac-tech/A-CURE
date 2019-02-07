@@ -1,26 +1,3 @@
-# [ACURE](https://gtr.ukri.org/projects?ref=NE%2FP013406%2F1) #
-
-The Aerosol-Cloud Uncertainty REduction project
-
-Ken Carslaw and Leighton Regayre UoL
-
-<hr>
-
-## Background information ##
-
-Looking at running UKCA Perturbed Parameter Ensemble. Updating version of [UM](http://cms.ncas.ac.uk/wiki/UM) used. Previously they were working the [UMUI](http://cms.ncas.ac.uk/wiki/UM/RunningUMOnArcher) (vn8.4) and we're going
-to move to running the [UM Rose Suites](http://cms.ncas.ac.uk/wiki/RoseCylc) v10.8 .
-
-A PPE is a perturbed parameter ensemble, so rather than perturbing a
-start file, each member will have different values for some (maybe
-only one) parameters (same start file).
-
-Detailed UM documentation can be found [here](https://code.metoffice.gov.uk/doc/um/latest/umdp.html) (login required)
-
-[CEMAC's Role is outlined in the pdf](https://github.com/cemachelen/Work_Notes/blob/master/ACURE/CEMAC_priorities_for_ACURE_v2_1-1.pdf)
-
-<hr>
-
 ## [Previous ACURE Work](https://github.com/cemac/A-CURE) ##
 
 
