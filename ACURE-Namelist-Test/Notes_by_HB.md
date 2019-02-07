@@ -121,7 +121,7 @@ and create a ticket summary following ticket summary template
 
 ```bash
 cd ~/roses/u-bf031
-rose edit -M ~/vn11.2_ACURE_namelist_test/rose-meta/um-atmos/HEAD
+rose edit -M ~/vn11.2_ACURE_namelist_test/rose-meta
 ```
 edit
 fcm_make - env- sources + um source
