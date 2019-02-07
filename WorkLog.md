@@ -27,7 +27,7 @@ rose edit -M ~/um/branches/vn11.2_ACURE-Training/rose-meta/`
 
 and the meta field in um should be set to `um-atmos/HEAD`
 
-This enables the modified meta data to be used. The current states of the rose suite and the code branch have both been committed to the repository.
+This enables the modified meta data to be used. The current states of the rose suite and the code branch have both been committed to the repository. The branch and rose suite have been tested, and run correctly, showing the existance of the ACURE variable in the namelist printout.
 
 ### The Ensemble Rose Suite
 
