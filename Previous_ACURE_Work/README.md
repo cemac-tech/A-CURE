@@ -102,14 +102,11 @@ does(n't),""
 
 ### Other Useful information ###
 
-* Leighton has provided previous scripts (*upload later*)
+* Leighton has provided previous scripts in this folder
 * Dave Sexton (MetOffice) previously has done hand edits
 * UKESM and UKCA release job do not work the same scientifically - be aware of.
 
 ### Actions ###
 
-* Finish UKCA Tutorials
 * Once UKESM on Archer can begin the process
-* Document changes well, here perhaps
-  * will aid Chris S and be useful for future suite set ups
 * Leighton has estimated 25 days for this part.
