@@ -35,6 +35,20 @@ drawing from the remote branch on the repository**
 
 ### The Ensemble Rose Suite
 
-Work will continue this afternoon on understanding the ensemble rose suite made by Dave Sexton (u-bf163). One quesation which needs answering is in what way do the required ensemble perturbations differ from those used by Dave Sexton?
+* Work continues on understanding the ensemble rose suite made by Dave Sexton (u-bf163). One quesation which needs answering is in what way do the required ensemble perturbations differ from those used by Dave Sexton?
 
-The Ensembles seem to be controlled through modification of the suite.rc file. This sets up cylc cycles with different ensemble members in each. This is an idea to investigate further.
+* The Ensembles seem to be controlled through modification of the suite.rc file. This sets up cylc cycles with different ensemble members in each. This is an idea to investigate further.
+
+* A problem with the original suite u-bd149 is that for some reason the archer username has been hard coded to be dcase (that would be David Case). In addition to this the variable $ARCHER_USERNAME had been set to be the same as the login name for puma
+
+* A further problem, this one being more general, is that the username I have on puma, `c.c.symonds` causes a Jinja2 error due to the dots. The error caused for this has the form 
+
+```[FAIL] cylc validate -v --strict u-bf163 # return-code=1, stderr=  
+[FAIL] Jinja2Error:
+[FAIL]   File "/usr/local/python/lib/python2.6/site-packages/Jinja2-2.7.3-py2.6.egg/jinja2/environment.py", 
+                line 397, in getattr
+[FAIL]     return getattr(obj, attribute)
+[FAIL] UndefinedError: 'c' is undefined```
+
+
+
