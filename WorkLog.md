@@ -48,7 +48,7 @@ drawing from the remote branch on the repository**
 [FAIL]   File "/usr/local/python/lib/python2.6/site-packages/Jinja2-2.7.3-py2.6.egg/jinja2/environment.py", 
                 line 397, in getattr
 [FAIL]     return getattr(obj, attribute)
-[FAIL] UndefinedError: 'c' is undefined```
-
-
+[FAIL] UndefinedError: 'c' is undefined
+```
+* The suite as it would run is held in `cylc-run/u-bf163/suite.rc.processed`. Comparison against the original suite.rc file should be very illuminating.
 
