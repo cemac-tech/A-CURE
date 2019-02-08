@@ -18,8 +18,8 @@ An attempt at compilation is needed, as is investigation of the ensemble rose su
 |Rose Suite|Description|
 |-|-|
 |u-bf163|A copy of the UKESM 1.0 beta suite with ensembles implemented|
-|u-bf737|A copy of the 1-day UKCA prototype release job for UKESM (also works with vn11.2). Set up to run the UM with ACURE variable `ukca_aeros_volc_so2`
-|u-bf766|A copy of u-bf737 for tinkering with|
+|u-bf737|A copy of the 1-day UKCA prototype release job for UKESM (also works with vn11.2). Set up to run the UM with ACURE variable `ukca_aeros_volc_so2`. Used for further development of including ensembles.|
+|u-bf766|A copy of u-bf737 made after ACURE namelist changes were confirmed to be working but no ensemble changes had been made. Good for rolling back.|
 
 The rose suite from the UKESM 1day proposed release job was copied, and should be run with the command
 
