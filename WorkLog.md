@@ -19,6 +19,7 @@ An attempt at compilation is needed, as is investigation of the ensemble rose su
 |-|-|
 |u-bf163|A copy of the UKESM 1.0 beta suite with ensembles implemented|
 |u-bf737|A copy of the 1-day UKCA prototype release job for UKESM (also works with vn11.2). Set up to run the UM with ACURE variable `ukca_aeros_volc_so2`
+|u-bf766|A copy of u-bf737 for tinkering with|
 
 The rose suite from the UKESM 1day proposed release job was copied, and should be run with the command
 
@@ -28,6 +29,9 @@ rose edit -M ~/um/branches/vn11.2_ACURE-Training/rose-meta/`
 and the meta field in um should be set to `um-atmos/HEAD`
 
 This enables the modified meta data to be used. The current states of the rose suite and the code branch have both been committed to the repository. The branch and rose suite have been tested, and run correctly, showing the existance of the ACURE variable in the namelist printout.
+
+**I need to figure out exactly how to make the metadata from a branch the default, so that the rose suite can be used on it's own
+drawing from the remote branch on the repository**
 
 ### The Ensemble Rose Suite
 
