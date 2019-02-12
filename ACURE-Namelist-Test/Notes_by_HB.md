@@ -18,7 +18,7 @@ Follow [coding standards](https://code.metoffice.gov.uk/doc/um/vn11.2/papers/umd
 
 Following the [namelist tutorial](https://code.metoffice.gov.uk/doc/um/latest/um-training/working-practices-tutorial.html)
 
-From Variables.list I have chosen AEROS_FF_EMS and Chris has chosen CLOUDPH.
+From Variables.list I have chosen AEROS_VOLC_SO2.
 
 ## Open Ticket ##
 
@@ -31,38 +31,38 @@ Following [working practices](https://code.metoffice.gov.uk/doc/um/latest/um-tra
 * keywords: macro, SC0138 (UKCA License agreement number)
 * owner: self
 
-ticket [#4641](https://code.metoffice.gov.uk/trac/um/ticket/4641#ticket)
+ticket [#4653](https://code.metoffice.gov.uk/trac/um/ticket/4653#ticket)
 created
 
 ## Checkout Branch ##
 
-`fcm branch-create -k 4641 ACURE_namelist_test fcm:um.x_tr@vn11.2`
+`fcm branch-create -k 4653 ACURE_Training fcm:um.x_tr@vn11.2`
 
 include #ticketno in the log message which will automatically link in trac
 
-`fcm checkout fcm:um.x_br/dev/helenburns/vn11.2_ACURE_namelist_test`
+`fcm checkout fcm:um.x_br/dev/christophersymonds/vn11.2_ACURE_Training`
 
-** note multiple branch checkouts its diskspace intensive, all version controlled so no need to hold on to local copies!**
+** note multiple branch checkouts is diskspace intensive, all version controlled so no need to hold on to local copies!**
 
 ## namelist change ##
 
 The namelist entry for aerosols will be in the UKCA
 
-`vn11.2_ACURE_namelist_test/src/atmosphere/UKCA/ukca_option_mod.F90`
+`vn11.2_ACURE_Training/src/atmosphere/UKCA/ukca_option_mod.F90`
 
-* Added in a switch  l_ukca_aeros_ff_ems default to FALSE
-* And the value ukca_aeros_ff_ems valid from 0 to 30
-* A print statement prints l_ukca_aeros_ff_ems = True/FALSE and
-  ukca_aeros_ff_ems = X
+* Added in a switch  l_ukca_aeros_volc_so2 default to FALSE
+* And the value ukca_aeros_volc_so2 valid from 0 to 50
+* A print statement prints l_ukca_aeros_volc_so2 = True/FALSE and
+  ukca_aeros_volc_so2 = X alongside the rest of the namelist entries
 
 ## metadata change ##
 
-`vn11.2_ACURE_namelist_test/rose-meta/um-atmos/HEAD/rose-meta.conf`
+`vn11.2_ACURE_Training/rose-meta/um-atmos/HEAD/rose-meta.conf`
 
 add in
 
-[namelist:run_ukca=l_ukca_aeros_ff_ems]
-[namelist:run_ukca=ukca_aeros_ff_ems]
+[namelist:run_ukca=l_ukca_aeros_volc_so2]
+[namelist:run_ukca=ukca_aeros_volc_so2]
 
 following the example of bio ems scaling parameter
 
@@ -73,7 +73,7 @@ following the example of bio ems scaling parameter
 `rose config-edit -C ./rose-stem/app/um_ukca_eg -M ./rose-meta`
 set meta-data version to be um-atmos/HEAD in the **um_ukca_eg**
 and fix the red warning flags by adding to config.
-* `fcm commit` with ticket number
+* `fcm commit` with ticket number and mosrs username
 
 ## macros ##
 
@@ -81,7 +81,6 @@ As we have added a new variable, we need to write an upgrade macro to add it to 
 
 `rose-meta/um-atmos/versionXX_YY.py` (`version112_113.py `)
 
-* grepped for `biom_aer_ems` and followed that template
 * `fcm commit` with ticket number
 
 ## Testing ##
@@ -96,16 +95,18 @@ As we have added a new variable, we need to write an upgrade macro to add it to 
 
   i.e.
 
-  `fcm branch-create --branch-of-branch -k y test_branch_ACURE_namelist_test -t test fcm:um.x_br/dev/helenburns/vn11.2_ACURE_namelist_test`
+  `fcm branch-create --branch-of-branch -k 4653 ACURE_TRAINING_TEST -t test fcm:um.x_br/dev/christophersymonds/vn11.2_ACURE-Training`
 
-1. `./admin/rose-stem/update_all.py --path=$PWD --um=vn11.2_t4641`
-  vn11.2_t4641 should match the AFTER_TAG in versionXX_YY.py
+1. `./admin/rose-stem/update_all.py --path=$PWD --um=vn11.2_t4653`
+  vn11.2_t4653 should match the AFTER_TAG in versionXX_YY.py
   * takes a while
 2. If the macro is valid it will run with out errors
   * `fcm diff -g` will show changes in rose stem apps
   * errors will need to be fixed in both test and dev branches
   * can test in dev and use `fcm revert`
 3. `fcm commit`
+
+Note - due to a few mistakes in code, I needed to create 4 different test branches before the macro would run properly.
 
 ## Documenting ##
 
@@ -117,12 +118,12 @@ and create a ticket summary following ticket summary template
 
 ## Testing on in ukca release job ##
 
-**u-bf031** (my rose suite of ukca release job 1 day)
+**u-bf766** (my rose suite of ukca release job 1 day)
 
 ```bash
-cd ~/roses/u-bf031
-rose edit -M ~/vn11.2_ACURE_namelist_test/rose-meta
+cd ~/roses/u-bf766
+rose edit -M ~/vn11.2_ACURE-Training/rose-meta
 ```
 edit
 fcm_make - env- sources + um source
-+ /home/hburns/vn11.2_ACURE_namelist_test
++ /home/c.c.symonds/vn11.2_ACURE-Training
