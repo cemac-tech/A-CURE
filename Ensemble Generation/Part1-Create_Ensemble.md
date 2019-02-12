@@ -158,9 +158,11 @@ Index: suite.rc
 +        post-script = save_wallclock.sh {{ RESUB }}
 +        [[[environment]]]
 +            ASTART=${ROSE_DATA}/$RUNID.astart_${CYLC_TASK_PARAM_ensemble}
-+            DATAM=$ROSE_DATA/{{DATAM}}/ensemble_$CYLC_TASK_PARAM_ensemble
-+            ENS_MEMBER=$CYLC_TASK_PARAM_ensemble
-+            
++            DATAM=$ROSE_DATA/{{DATAM}}/ensemble_${CYLC_TASK_PARAM_ensemble}
++            ENS_MEMBER=${CYLC_TASK_PARAM_ensemble}
+###################################### Leaving the {} off the CYLC_TASK_PARAM_ensemble variable results in
+###################################### and "unbound variable" error
+            
      [[fcm_make_pp]]
          inherit = RUN_MAIN, EXTRACT_RESOURCE
      [[fcm_make2_pp]]
@@ -189,9 +191,9 @@ With regards to the perturbation, the UKESM suite with Ensembles uses a python s
                      fcm_make_um
                           |
                     fcm_make2_um --¬  install_ancils
-                     |    \   \     \/   /      /| 
-                     |     \   \   / \ /      /  |
-                     |      \   \/   /\     /    | 
+                     |    \   \     \/    /     /| 
+                     |     \   \   / \  /     /  |
+                     |      \   \/    X     /    | 
                      |       \ / recon \  /      |
                      |       /\/  |   \ X        |
                      |     / / \  |   /\ \       |
