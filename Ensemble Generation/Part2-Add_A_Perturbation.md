@@ -16,4 +16,9 @@ A possible solution would be to create a copy of rose-app.conf (possibly rose-ap
 ---
 > ukca_aeros_volc_so2=29.1,
 ```
-This means that individual rose-app.conf files will be needed for the different ensembles, and the ensembles will have to somehow know to read these files. I honestly have no idea how this can be done yet. A different possibility would be for the perturb script to change the rose-app.conf file and for there to be an exclusive run condition for the `perturb=>atmos_main` groups 
+This means that individual rose-app.conf files will be needed for the different ensembles, and the ensembles will have to somehow know to read these files. In-built settings allow this through putting a specific configuration file into the folder `/app/um/opt` which is then appended onto the end of the master rose-app.conf file. This can then override matching values in the main configuration file (you can find details about optional configurations [here](https://metomi.github.io/rose/doc/html/api/configuration/rose-configuration-format.html#optional-configuration) and [here](https://metomi.github.io/rose/doc/html/tutorial/rose/furthertopics/optional-configurations.html))
+
+A python app is called in `u-bf737` which takes as arguments the location of a file with the namelist variable in it, changes it, and then places the resulting file in the `app/um/opt` folder. This python script is called by cylc.
+
+A full list of the changed can be found by diffing `u-bf737` and `u-bf766`
+
