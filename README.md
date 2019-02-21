@@ -42,4 +42,4 @@ Tasks to produce the deliverable will include:
 Currently, various resources have been used. Among these are:
 
 * The UKCA tutorials which instruct on the addition of variables to the UKCA section of the UM
-* An ensemble rose suite which could be repurposed
+* A pair of ensemble rose suites which could be repurposed, one by david case with local copy u-bf163 and one by grenville with local copy u-al652-ens-l (see email)
