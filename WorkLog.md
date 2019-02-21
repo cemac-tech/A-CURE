@@ -263,3 +263,12 @@ With regards to the perturbation, the UKESM suite with Ensembles uses a python s
                           \       |     /      
                             housekeeping
 ```
+
+
+## Current state as of 2019/02/21
+
+Perturbed ensembles can now be generated thanks to a combination of edits to the suite.rc file and the addition of a python script as an app. The important bits to allow this are :
+1. A parameterised cylc task using a `[[parameter]]` block in the runtime section, which then allows ensembles of tasks with the identifier `taskname<ens>` for an ensembling parameter `ens`
+2. Use of the `ROSE_APP_OPT_CONF_KEYS` variable to select namelist additions which can overwrite previous entries in the namelist.
+
+Descriptions of how this is done can be found in the folder "Ensemble Generation"
