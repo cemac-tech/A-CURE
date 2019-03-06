@@ -17,7 +17,7 @@ only one) parameters (same start file).
 
 Detailed UM documentation can be found [here](https://code.metoffice.gov.uk/doc/um/latest/umdp.html) (login required)
 
-[CEMAC's Role is outlined in the pdf](https://github.com/cemachelen/Work_Notes/blob/master/ACURE/CEMAC_priorities_for_ACURE_v2_1-1.pdf)
+[CEMAC's Role is outlined in the pdf](CEMAC_priorities_for_ACURE_v2_1-1.pdf)
 
 <hr>
 
