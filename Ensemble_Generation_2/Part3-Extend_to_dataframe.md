@@ -1,4 +1,4 @@
-#Extending the Perturbation System to use a Dataframe
+# Extending the Perturbation System to use a Dataframe
 
 The python script used to generate the ensemble configuration files has been expanded significantly. This has involved changing the way in which the new values for variables are determined - replacing a calculated value with values read in from a csv file which is converted into a pandas dataframe. The script now takes 4 arguments:
 1. The input template location, which contains logical switches for all of the PPE variables
