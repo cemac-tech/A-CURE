@@ -4,7 +4,75 @@ To implement the ensemble changes into the AMIP suite (which uses UM vn11.1 curr
 
 The changes made to the rose-meta.conf and rose-suite.conf files described in the previous section [here](../Part3-Extend_to_dataframe.md) were copied over into the AMIP versions of these files, as was the changes to the suite.rc file allowing non-sequential ensemble numbers and dataframes to be used.
 
+To ensure that when ensembling is not required the suite will still run and PPE variables can be still set, a number of conditional statements have been included in the suite.rc file, as shown below:
+
+```ini
+{% if ENS_LOG %}
+[[parameters]]
+    ens = {{ ENS_COMB | join(', ') }}
+{% endif %}
+
+...
+
+{% if SITE == 'archer' %}
+[[queues]]
+    [[[default]]]
+        limit=28
+{% endif %}
+
+...
+
+{% if ENS_LOG %}
+{% set BUILD_GRAPH = BUILD_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else BUILD_GRAPH %}
+{% else %}
+{% set BUILD_GRAPH = BUILD_GRAPH ~ ' => atmos_main' if TASK_RUN else BUILD_GRAPH %}
+{% endif %}
+
+...
+
+{% if ENS_LOG %}
+{% set INIT_GRAPH = INIT_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else INIT_GRAPH %}
+{% else %}
+{% set INIT_GRAPH = INIT_GRAPH ~ ' => atmos_main' if TASK_RUN else INIT_GRAPH %}
+{% endif %}
+
+...
+
+[[[ {{EXPT_RESUB}} ]]]
+    {% if ENS_LOG %}
+    graph = atmos_main<ens> => {{ RESUB_GRAPH }}
+    {% else %}
+    graph = atmos_main => {{ RESUB_GRAPH }}
+    {% endif %}
+
+{% if TASK_ARCH_WALL %}
+[[[ R1//^+{{EXPT_RUNLEN}}-{{EXPT_RESUB}} ]]]
+    {% if ENS_LOG %}
+    graph = atmos_main<ens> => rose_arch_wallclock => housekeeping
+    {% else %}
+    graph = atmos_main => rose_arch_wallclock => housekeeping
+    {% endif %}
+{% endif %}
+
+...
+
+[[atmos_main]]
+    inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
+    post-script = save_wallclock.sh {{EXPT_RESUB}}
+
+[[atmos_main<ens>]]
+    inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
+    post-script = save_wallclock.sh {{EXPT_RESUB}}
+    [[[environment]]]
+        ROSE_APP_OPT_CONF_KEYS = ens_${CYLC_TASK_PARAM_ens} {{CONFIG_OPT}} {{BITCOMP_NRUN_OPT}}
+        DATAM=$ROSE_DATA/{{DATAM}}/ens_${CYLC_TASK_PARAM_ens}
+        ENS_MEMBER=${CYLC_TASK_PARAM_ens}
+
+```
+
+These conditional statements ensure that if ensembling is not enabled, the suite will still run as normal with no extra settings required and still be able to read in the PPE variables as set in the GUI.
+
+
 Work still pending includes:
-* Ensuring that running in non-ensemble mode allows the parameter values to be picked up from the GUI
 * Checking to see if post processing can work with ensembling - this is of vital importance
 * Testing with the AMIP suite

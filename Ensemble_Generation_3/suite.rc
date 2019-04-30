@@ -50,8 +50,10 @@
     [[events]]
         mail events = shutdown
 
+    {% if ENS_LOG %}
     [[parameters]]
         ens = {{ ENS_COMB | join(', ') }}
+    {% endif %}
 
 [scheduling]
 
@@ -59,9 +61,12 @@
     initial cycle point     = {{EXPT_BASIS}}
     final cycle point       = +{{EXPT_RUNLEN}}-PT1S
     max active cycle points = 4
+
+    {% if SITE == 'archer' %}
     [[queues]]
         [[[default]]]
             limit=28
+    {% endif %}
 
     [[special tasks]]
         sequential = atmos_main, postproc, archive_integrity, pptransfer, supermean, housekeeping, rose_arch_logs
@@ -73,7 +78,11 @@
         {% set BUILD_GRAPH = 'fcm_make_um' %}
         {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => fcm_make2_um' if SITE in DBLE_FCMUM else BUILD_GRAPH %}
         {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => recon' if TASK_RECON else BUILD_GRAPH %}
+        {% if ENS_LOG %}
         {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else BUILD_GRAPH %}
+        {% else %}
+        {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => atmos_main' if TASK_RUN else BUILD_GRAPH %}
+        {% endif %}
 
         [[[ R1 ]]]
             graph = {{ BUILD_GRAPH }}
@@ -82,7 +91,11 @@
         {# Set up first cycle graph #}
         {% set INIT_GRAPH = 'install_cold => install_ancil' %}
         {% set INIT_GRAPH = INIT_GRAPH ~ ' => recon' if TASK_RECON else INIT_GRAPH %}
+        {% if ENS_LOG %}
         {% set INIT_GRAPH = INIT_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else INIT_GRAPH %}
+        {% else %}
+        {% set INIT_GRAPH = INIT_GRAPH ~ ' => atmos_main' if TASK_RUN else INIT_GRAPH %}
+        {% endif %}
 
         [[[ R1 ]]]
             graph = {{ INIT_GRAPH }}
@@ -117,11 +130,19 @@
         {% set RESUB_GRAPH = RESUB_GRAPH ~ 'housekeeping' %}
 
         [[[ {{EXPT_RESUB}} ]]]
+            {% if ENS_LOG %}
             graph = atmos_main<ens> => {{ RESUB_GRAPH }}
+            {% else %}
+            graph = atmos_main => {{ RESUB_GRAPH }}
+            {% endif %}
 
         {% if TASK_ARCH_WALL %}
         [[[ R1//^+{{EXPT_RUNLEN}}-{{EXPT_RESUB}} ]]]
+            {% if ENS_LOG %}
             graph = atmos_main<ens> => rose_arch_wallclock => housekeeping
+            {% else %}
+            graph = atmos_main => rose_arch_wallclock => housekeeping
+            {% endif %}
         {% endif %}
 
 {# Include tests graph if required #}
@@ -222,11 +243,15 @@
             CONF_LOC=${CYLC_SUITE_RUN_DIR}/app/um/opt
             DF_LOC=${CYLC_SUITE_RUN_DIR}/{{ENS_CSV}}
 
+    [[atmos_main]]
+        inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
+        post-script = save_wallclock.sh {{EXPT_RESUB}}
+
     [[atmos_main<ens>]]
         inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
         post-script = save_wallclock.sh {{EXPT_RESUB}}
         [[[environment]]]
-            ROSE_APP_OPT_CONF_KEYS = ens_${CYLC_TASK_PARAM_ens} {{UM_OPT_KEYS}} {{BITCOMP_NRUN_OPT}}
+            ROSE_APP_OPT_CONF_KEYS = ens_${CYLC_TASK_PARAM_ens} {{CONFIG_OPT}} {{BITCOMP_NRUN_OPT}}
             DATAM=$ROSE_DATA/{{DATAM}}/ens_${CYLC_TASK_PARAM_ens}
             ENS_MEMBER=${CYLC_TASK_PARAM_ens}
 
