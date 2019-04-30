@@ -9,7 +9,7 @@ Ken Carslaw and Leighton Regayre UoL
 ## Background information ##
 
 Looking at running UKCA Perturbed Parameter Ensemble. Updating version of [UM](http://cms.ncas.ac.uk/wiki/UM) used. Previously they were working the [UMUI](http://cms.ncas.ac.uk/wiki/UM/RunningUMOnArcher) (vn8.4) and we're going
-to move to running the [UM Rose Suites](http://cms.ncas.ac.uk/wiki/RoseCylc) v10.8 .
+to move to running the [UM Rose Suites](http://cms.ncas.ac.uk/wiki/RoseCylc) v11.1 .
 
 A PPE is a perturbed parameter ensemble, so rather than perturbing a
 start file, each member will have different values for some (maybe
