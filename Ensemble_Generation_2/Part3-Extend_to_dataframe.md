@@ -6,6 +6,8 @@ The python script used to generate the ensemble configuration files has been exp
 3. The dataframe location
 4. A space separated list of the ensemble indices.
 
+
+
 To be able to pass the correct values to the python script and control the ensembling, a set of modifications were needed for the suite.rc, rose-suite.conf and meta/rose-meta.conf files to allow for new parameters.
 
 The changes in the rose-suite.conf file allow the introduction of new rose variables:
@@ -88,8 +90,6 @@ Finally, the suite.rc file is modified to allow non-sequential ensemble numbers 
         {% do ENS_COMB.append(mem) %}
     {% endif %}
 {% endfor %}
-
-
 
 [cylc]
     UTC mode = True
