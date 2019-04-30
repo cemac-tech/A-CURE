@@ -30,8 +30,7 @@ and the meta field in um should be set to `um-atmos/HEAD`
 
 This enables the modified meta data to be used. The current states of the rose suite and the code branch have both been committed to the repository. The branch and rose suite have been tested, and run correctly, showing the existance of the ACURE variable in the namelist printout.
 
-**I need to figure out exactly how to make the metadata from a branch the default, so that the rose suite can be used on it's own
-drawing from the remote branch on the repository**
+**I need to figure out exactly how to make the metadata from a branch the default, so that the rose suite can be used on it's own, drawing from the remote branch on the repository**
 
 ### The Ensemble Rose Suite
 
@@ -41,11 +40,11 @@ drawing from the remote branch on the repository**
 
 * A problem with the original suite u-bd149 is that for some reason the archer username has been hard coded to be dcase (that would be David Case). In addition to this the variable $ARCHER_USERNAME had been set to be the same as the login name for puma
 
-* A further problem, this one being more general, is that the username I have on puma, `c.c.symonds` causes a Jinja2 error due to the dots. The error caused for this has the form 
+* A further problem, this one being more general, is that the username I have on puma, `c.c.symonds` causes a Jinja2 error due to the dots. The error caused for this has the form
 
 ```[FAIL] cylc validate -v --strict u-bf163 # return-code=1, stderr=  
 [FAIL] Jinja2Error:
-[FAIL]   File "/usr/local/python/lib/python2.6/site-packages/Jinja2-2.7.3-py2.6.egg/jinja2/environment.py", 
+[FAIL]   File "/usr/local/python/lib/python2.6/site-packages/Jinja2-2.7.3-py2.6.egg/jinja2/environment.py",
                 line 397, in getattr
 [FAIL]     return getattr(obj, attribute)
 [FAIL] UndefinedError: 'c' is undefined
@@ -58,7 +57,7 @@ drawing from the remote branch on the repository**
 
 To use ensembles, you must use parameterisation in the suite configuration file `suite.rc`
 
-Changes were made to the `u-bf737` suite, with the aim of implementing ensembles. Currently the ensembles are generated but cannot run to completion. 
+Changes were made to the `u-bf737` suite, with the aim of implementing ensembles. Currently the ensembles are generated but cannot run to completion.
 
 To summarise, the changes to the `suite.rc` file consist of:
 * `ensemble = {{ range(ENSEMBLE_SIZE) | join(', ') }}` which sets up the list of ensemble members inside a `[[parameter]]` block within the `[cylc]` heading
@@ -67,11 +66,11 @@ To summarise, the changes to the `suite.rc` file consist of:
 
 * adding in an `atmos_main<ensemble>` task which overwrites the data output location. **THIS HAS NOT BEEN CORRECTLY IMPLEMENTED ABOVE**
 
-In addition to this, 
+In addition to this,
 
 * the `rose-suite.conf` file needs the `ENSEMBLE_SIZE` parameter to be present to pass to suite.rc on running
 * the `app/um/rose-app.conf` file needs `ENS_MEMBER=${ENS_MEMBER}` which is passed from suite.rc and replaces default value of `ENS_MEMBER=0`
-* the `meta/rose-meta.conf` file should have an entry for the Ensemble_Size parameter so that it appears in the rose GUI. This is not however necessary as if this is not included the parameter will apper in the `jinja2` heading in the GUI. 
+* the `meta/rose-meta.conf` file should have an entry for the Ensemble_Size parameter so that it appears in the rose GUI. This is not however necessary as if this is not included the parameter will apper in the `jinja2` heading in the GUI.
 
 Work is still ongoing to ensure that :
 1. the output data goes to the correct place
