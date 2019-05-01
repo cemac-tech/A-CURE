@@ -496,7 +496,57 @@ NAMELIST/run_ukca/ l_ukca, l_ukca_aie1, l_ukca_aie2,              &
          max_ageair_reset_height,                                 &
          i_ukca_sad_months, i_ukca_sad_start_year,                &
          l_ukca_limit_nat, l_ukca_linox_scaling,                  &
-         l_ukca_debug_asad
+         l_ukca_debug_asad                                        &
+         l_ukca_acure_dummy_01, ukca_acure_dummy_01,                  &
+         l_ukca_acure_dummy_02, ukca_acure_dummy_02,                  &
+         l_ukca_acure_dummy_03, ukca_acure_dummy_03,                  &
+         l_ukca_acure_dummy_04, ukca_acure_dummy_04,                  &
+         l_ukca_acure_dummy_05, ukca_acure_dummy_05,                  &
+         l_ukca_acure_dummy_06, ukca_acure_dummy_06,                  &
+         l_ukca_acure_dummy_07, ukca_acure_dummy_07,                  &
+         l_ukca_acure_dummy_08, ukca_acure_dummy_08,                  &
+         l_ukca_acure_dummy_09, ukca_acure_dummy_09,                  &
+         l_ukca_acure_dummy_10, ukca_acure_dummy_10,                  &
+         l_ukca_acure_dummy_11, ukca_acure_dummy_11,                  &
+         l_ukca_acure_dummy_12, ukca_acure_dummy_12,                  &
+         l_ukca_acure_dummy_13, ukca_acure_dummy_13,                  &
+         l_ukca_acure_dummy_14, ukca_acure_dummy_14,                  &
+         l_ukca_acure_dummy_15, ukca_acure_dummy_15,                  &
+         l_ukca_acure_dummy_16, ukca_acure_dummy_16,                  &
+         l_ukca_acure_dummy_17, ukca_acure_dummy_17,                  &
+         l_ukca_acure_dummy_18, ukca_acure_dummy_18,                  &
+         l_ukca_acure_dummy_19, ukca_acure_dummy_19,                  &
+         l_ukca_acure_dummy_20, ukca_acure_dummy_20,                  &
+         l_ukca_acure_dummy_21, ukca_acure_dummy_21,                  &
+         l_ukca_acure_dummy_22, ukca_acure_dummy_22,                  &
+         l_ukca_acure_dummy_23, ukca_acure_dummy_23,                  &
+         l_ukca_acure_dummy_24, ukca_acure_dummy_24,                  &
+         l_ukca_acure_dummy_25, ukca_acure_dummy_25,                  &
+         l_ukca_acure_dummy_26, ukca_acure_dummy_26,                  &
+         l_ukca_acure_dummy_27, ukca_acure_dummy_27,                  &
+         l_ukca_acure_dummy_28, ukca_acure_dummy_28,                  &
+         l_ukca_acure_dummy_29, ukca_acure_dummy_29,                  &
+         l_ukca_acure_dummy_30, ukca_acure_dummy_30,                  &
+         l_ukca_acure_dummy_31, ukca_acure_dummy_31,                  &
+         l_ukca_acure_dummy_32, ukca_acure_dummy_32,                  &
+         l_ukca_acure_dummy_33, ukca_acure_dummy_33,                  &
+         l_ukca_acure_dummy_34, ukca_acure_dummy_34,                  &
+         l_ukca_acure_dummy_35, ukca_acure_dummy_35,                  &
+         l_ukca_acure_dummy_36, ukca_acure_dummy_36,                  &
+         l_ukca_acure_dummy_37, ukca_acure_dummy_37,                  &
+         l_ukca_acure_dummy_38, ukca_acure_dummy_38,                  &
+         l_ukca_acure_dummy_39, ukca_acure_dummy_39,                  &
+         l_ukca_acure_dummy_40, ukca_acure_dummy_40,                  &
+         l_ukca_acure_dummy_41, ukca_acure_dummy_41,                  &
+         l_ukca_acure_dummy_42, ukca_acure_dummy_42,                  &
+         l_ukca_acure_dummy_43, ukca_acure_dummy_43,                  &
+         l_ukca_acure_dummy_44, ukca_acure_dummy_44,                  &
+         l_ukca_acure_dummy_45, ukca_acure_dummy_45,                  &
+         l_ukca_acure_dummy_46, ukca_acure_dummy_46,                  &
+         l_ukca_acure_dummy_47, ukca_acure_dummy_47,                  &
+         l_ukca_acure_dummy_48, ukca_acure_dummy_48,                  &
+         l_ukca_acure_dummy_49, ukca_acure_dummy_49,                  &
+         l_ukca_acure_dummy_50, ukca_acure_dummy_50
 
 ! -----------------------------------------------------------------------------
 ! These are set in ukca_setup_chem_mod after the namelist is read

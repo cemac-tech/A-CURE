@@ -17,7 +17,7 @@ with open("./acure.txt") as f:
 j=850
 
 out=open("./acure_meta.conf","w")
-    
+
 for var in var_lst:
     out.write("[namelist:run_ukca=l_%s]\n" % var)
     out.write ("compulsory=true\n")
@@ -29,7 +29,7 @@ for var in var_lst:
     out.write ("trigger=namelist:run_ukca=%s: .true.;\n" % var)
     out.write ("type=logical\n\n")
     j+=1
-    
+
 for var in var_lst:
     out.write ("[namelist:run_ukca=%s]\n" % var)
     out.write ("compulsory=true\n")
@@ -73,17 +73,22 @@ out3.write('!******************ACURE LOGICALS*************************!\n\n')
 
 for var in var_lst:
     out3.write('LOGICAL :: l_%s           = .FALSE.\n' % var)
-    
+
 out3.write('\n\n!*****************End ACURE LOGICALS**********************!\n\n')
 
 out3.write('!******************ACURE REALS*************************!\n\n')
 
 for var in var_lst:
     out3.write('REAL :: %s           = rmdi\n' % var)
-    
+
 out3.write('\n\n!*****************End ACURE REALS**********************!\n\n')
 
-out3.write('Insert the following before the line \"CALL umPrint(\'- - - - - - end of namelist - - - - - -\', &)\"\n\n')
+out3.write('Insert the following at the end of the namelist block starting \"NAMELIST/run_ukca/\"\n')
+
+for var in var_lst:
+    out3.write("         l_%s, %s,                  &\n" % (var,var))
+
+out3.write('\n\nInsert the following before the line \"CALL umPrint(\'- - - - - - end of namelist - - - - - -\', &)\"\n\n')
 
 for var in var_lst:
     out3.write('WRITE(lineBuffer,\'(A,L1)\')\'  l_%s = \', l_%s\n' % (var,var))
@@ -95,12 +100,12 @@ out3.write('\n\nInsert the following in \"TYPE my_namelist"\n\n')
 
 for var in var_lst:
     out3.write('  REAL :: %s\n' % var)
-    
+
 out3.write('\n\n')
 
 for var in var_lst:
     out3.write('  LOGICAL :: l_%s\n' % var)
-    
+
 out3.write('\nAfter \"IF (mype == 0) THEN\", insert\n\n')
 
 for var in var_lst:
@@ -110,7 +115,7 @@ out3.write('\n\n')
 
 for var in var_lst:
     out3.write('  my_nml %% l_%s = l_%s\n' % (var,var))
-    
+
 out3.write('\nAfter \"IF (mype /= 0) THEN\", insert\n\n')
 
 for var in var_lst:
@@ -119,4 +124,6 @@ for var in var_lst:
 out3.write('\n\n')
 
 for var in var_lst:
-    out3.write('  %s = my_nml %% l_%s\n' % (var,var))   
+    out3.write('  %s = my_nml %% l_%s\n' % (var,var))
+
+out3.close()
