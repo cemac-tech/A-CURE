@@ -496,7 +496,7 @@ NAMELIST/run_ukca/ l_ukca, l_ukca_aie1, l_ukca_aie2,              &
          max_ageair_reset_height,                                 &
          i_ukca_sad_months, i_ukca_sad_start_year,                &
          l_ukca_limit_nat, l_ukca_linox_scaling,                  &
-         l_ukca_debug_asad                                        &
+         l_ukca_debug_asad,                                       &
          l_ukca_acure_dummy_01, ukca_acure_dummy_01,                  &
          l_ukca_acure_dummy_02, ukca_acure_dummy_02,                  &
          l_ukca_acure_dummy_03, ukca_acure_dummy_03,                  &
