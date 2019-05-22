@@ -6,13 +6,13 @@ Name: perturb_ppe.py
 Description:
     Perturb a set parameter in the namelist by creating a new rose-app.conf
     file in the app/um/opt folder. A directive in the suite.rc file points the
-    atmos_main task to the relevant altered rose-app.conf file. Values for the
+    atmos_main task to the relevant altered rose-app.conf file. Values for the 
     parameter are determined by reading specific rows in a dataframe csv file
 
 Required Arguments:
     input  : location of template configuration file, referred to as CONF_LOC by cylc.
-             Template file is to contain every parameter to be perturbed as a
-             logical set to false, as each parameter has an associated logical in the
+             Template file is to contain every parameter to be perturbed as a 
+             logical set to false, as each parameter has an associated logical in the 
              um namelists.
     ens    : The ensemble number list, referred to as ens by cylc. The elements of the
              list are provided by cylc as a space separated list of parameters
@@ -42,7 +42,7 @@ class FileError(Exception):
     def __init__(self,msg):
         print ('[FILE ERROR] : %s' % msg )
         raise SystemExit
-
+        
 def file_val(fname,head,path_data):
     '''
     Returns number of lines in file which are not namelist block header lines
@@ -88,35 +88,45 @@ def subparam(ens_dict, source, dest):
 
     for name in ens_dict:
         rep["l_"+name+"=.false."]="l_"+name+"=.true."
-
+    
     pattern = re.compile("|".join(rep.keys()))
 
     for line in fin:
 
         repl_flg=0
-
+        
         out = pattern.sub(lambda match: rep[match.group(0)], line)
+        if not "\n" in out:
+            out = out + "\n"
+            if ".false." in out:
+                num_replaced -=1
+
         fout.write(out)
         if out != line:
             num_replaced += 1
             repl_flg += 1
+            print (out)
 
     if num_replaced == len(ens_dict):
         for (name,val) in ens_dict.items():
-            fout.write("\n%s=%s" % (name,val))
+            fout.write("%s=%s\n" % (name,val))
     else:
+        for (name,val) in ens_dict.items():
+            print("%s=%s\n" % (name,val))
+        fin.close()
+        fout.close()
         raise FileError('One or more of the expected parameters were not replaced.\n'
                         + 'Expected to replace '+str(len(ens_dict))+' but replaced '
-                        + str(num_replaced)+"\n")
+                        + str(num_replaced)+" in " + dest + "\n")
 
     fin.close()
     fout.close()
-
+    
 def check_int(s):
     s = str(s)
     if s[0] in ('-', '+'):
         return s[1:].isdigit()
-    return s.isdigit()
+    return s.isdigit()  
 
 
 def main():
@@ -167,7 +177,7 @@ def main():
 
     if not os.path.exists(conf_in):
         raise ArgumentsError('Template namelist file does not exist: ' + conf_in +"\n")
-
+        
     path_out = args.output
 
     if args.output==".":
@@ -199,7 +209,7 @@ def main():
     if file_val(conf_in,head,path_data) != df.shape[1]:
         raise FileError("Mismatch between dataframe variable number in "+path_data+
                         " and template file "+conf_in +"\n")
-
+           
     ens_lst = args.ens
     chkset=set(ens_lst)
     if not len(chkset) == len(ens_lst):
@@ -209,7 +219,7 @@ def main():
         raise ArgumentsError("More ensemble members requested than exist within dataframe\n")
 
     for ens in ens_lst:
-
+        
         if not check_int(ens):
             raise ArgumentsError("Non-integer ensemble indices detected in ensemble member list")
         ens_int_val=int(ens)

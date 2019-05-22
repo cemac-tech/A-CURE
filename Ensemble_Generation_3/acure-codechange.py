@@ -46,12 +46,12 @@ out.close()
 
 out2=open("./acure_macro.py","w")
 
-out2.write('class vn112_t4751(rose.upgrade.MacroUpgrade):\n')
+out2.write('class vn111_t4751(rose.upgrade.MacroUpgrade):\n')
 
 out2.write('    """Upgrade macro for ticket #4751 by christophersymonds."""\n\n')
 
-out2.write('    BEFORE_TAG = "vn11.2"\n')
-out2.write('    AFTER_TAG = "vn11.2_t4751"\n\n')
+out2.write('    BEFORE_TAG = "vn11.1"\n')
+out2.write('    AFTER_TAG = "vn11.1_t4751"\n\n')
 
 out2.write('    def upgrade(self, config, meta_config=None):\n')
 out2.write('        \"\"\"Upgrade a UM runtime app configuration with ACURE PPE variables.\"\"\"\n\n')
