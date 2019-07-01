@@ -22,6 +22,7 @@ Required Arguments:
              and the character "x" in cells where the variable is not used for that ensemble
 
 '''
+import sys
 import os
 import re
 import argparse
@@ -32,35 +33,39 @@ class ArgumentsError(Exception):
     Exception raised when there is an error detected in the argument list.
     '''
     def __init__(self, msg):
-        print ('[FATAL ERROR] : %s' % msg )
-        raise SystemExit
+        sys.stderr.write('[FATAL ERROR] : %s' % msg )
+        sys.exit(9)
 
 class FileError(Exception):
     '''
     Exception raised when contents of files are not as expected
     '''
     def __init__(self,msg):
-        print ('[FILE ERROR] : %s' % msg )
-        raise SystemExit
-        
+        sys.stderr.write('[FILE ERROR] : %s' % msg )
+        sys.exit(9)
+
 def file_val(fname,head,path_data):
     '''
     Returns number of lines in file which are not namelist block header lines
     Also verifies that the template.conf file has the correct format and has all
     correct variables present
     '''
-    h,j,k=0,0,0
+    h,j,k,m=0,0,0,0
     headlog=[]
     for e in head:
-        headlog.append("l_"+e+"=.false.")
+        if not re.match("acure",e):
+            headlog.append("l_acure_"+e+"=.false.")
+        else:
+            headlog.append("l_"+e+"=.false.")
     pattern=re.compile('|'.join(headlog))
     with open(fname) as f:
         for i, l in enumerate(f, 1):
             if re.match("^\[namelist:([^\]]*?)\]",l): j+=1
             if re.match("^l_([^=]*?)=\.false\.$", l): h+=1
+            if l=="\n": m+=1
             if pattern.search(l): k+=1
-    if not h == i-j:
-        raise FileError(str(i-j-h)+" entries in the template file had wrong format.\n"
+    if not h == i-j-m:
+        raise FileError(str(i-j-h-m)+" entries in the template file had wrong format.\n"
                         +"Entries should be assignment of false to logical switches"
                         +" for every PPE variable or namelist block headers.\n")
     if not h == k:
@@ -79,49 +84,53 @@ def subparam(ens_dict, source, dest):
         dest (str): destination filename
     """
 
-    fin = open(source, 'r')
-    fout = open(dest, 'w')
+    outlst = []
 
     num_replaced = 0
 
     rep={}
 
     for name in ens_dict:
-        rep["l_"+name+"=.false."]="l_"+name+"=.true."
-    
+        if re.match("acure",name):
+            rep["l_"+name+"=.false."]="l_"+name+"=.true."
+        else:
+            rep["l_acure_"+name+"=.false."]="l_acure_"+name+"=.true."
+
     pattern = re.compile("|".join(rep.keys()))
 
-    for line in fin:
+    with open (source, 'r') as fin:
+        for line in fin:
 
-        repl_flg=0
-        
-        out = pattern.sub(lambda match: rep[match.group(0)], line)
-        if not "\n" in out:
-            out = out + "\n"
-            if ".false." in out:
-                num_replaced -=1
+            repl_flg=0
 
-        fout.write(out)
-        if out != line:
-            num_replaced += 1
-            repl_flg += 1
-            print (out)
+            out = pattern.sub(lambda match: rep[match.group(0)], line)
+            if not "\n" in out:
+                out = out + "\n"
+                if ".false." in out:
+                    num_replaced -=1
+
+            outlst.append(out)
+            if out != line:
+                num_replaced += 1
+                repl_flg += 1
+                print (out)
 
     if num_replaced == len(ens_dict):
         for (name,val) in ens_dict.items():
-            fout.write("%s=%s\n" % (name,val))
+            teststr="_"+name+"="
+            for i, line in enumerate(outlst):
+                if teststr in line:
+                    outlst.insert(i+1,name+"="+val+"\n")
+        with open(dest, 'w') as fout:
+            for line in outlst:
+                fout.write("%s" % line)
     else:
         for (name,val) in ens_dict.items():
             print("%s=%s\n" % (name,val))
-        fin.close()
-        fout.close()
         raise FileError('One or more of the expected parameters were not replaced.\n'
                         + 'Expected to replace '+str(len(ens_dict))+' but replaced '
                         + str(num_replaced)+" in " + dest + "\n")
 
-    fin.close()
-    fout.close()
-    
 def check_int(s):
     s = str(s)
     if s[0] in ('-', '+'):
@@ -146,7 +155,7 @@ def main():
                         nargs="*",
                         type=int,
                         help='Space separated list of ensemble numbers',
-                        default=[3, 34])
+                        default=[3, 63])
 
     parser.add_argument('--output', '-o ',
                         type=str,
@@ -164,6 +173,10 @@ def main():
     print("Output location    : %s" % args.output)
     print("Dataframe Location : %s" % args.data)
     print("Ensemble Indices   : %s" % args.ens)
+
+    """
+    Check the input Arguments
+    """
 
     path_in = args.input
     if not os.path.exists(path_in):
