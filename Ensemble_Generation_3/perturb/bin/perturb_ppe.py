@@ -121,6 +121,9 @@ def subparam(ens_dict, source, dest):
             for i, line in enumerate(outlst):
                 if teststr in line:
                     outlst.insert(i+1,name+"="+val+"\n")
+                    if (name=="m_ci" or name=="a_ent_1_rp"):
+                        outlst.insert(i+2,name+"_min="+val+"\n")
+                        outlst.insert(i+3,name+"_max="+val+"\n")
         with open(dest, 'w') as fout:
             for line in outlst:
                 fout.write("%s" % line)
