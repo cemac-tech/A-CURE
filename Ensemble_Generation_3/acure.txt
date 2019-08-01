@@ -2,6 +2,28 @@
 acure_bl_nuc
 acure_ait_width
 acure_cloud_ph
+acure_carb_ff_ems_region_1
+acure_carb_ff_ems_region_2
+acure_carb_ff_ems_region_3
+acure_carb_ff_ems_region_4
+acure_carb_ff_ems_region_5
+acure_carb_ff_ems_region_6
+acure_carb_bb_ems_region_1
+acure_carb_bb_ems_region_2
+acure_carb_bb_ems_region_3
+acure_carb_bb_ems_region_4
+acure_carb_bb_ems_region_5
+acure_carb_bb_ems_region_6
+acure_carb_res_ems_region_1
+acure_carb_res_ems_region_2
+acure_carb_res_ems_region_3
+acure_carb_res_ems_region_4
+acure_carb_res_ems_region_5
+acure_anth_so2_region_1
+acure_anth_so2_region_2
+acure_anth_so2_region_3
+acure_anth_so2_region_4
+acure_anth_so2_region_5
 acure_carb_ff_ems
 acure_carb_bb_ems
 acure_carb_res_ems
@@ -37,16 +59,16 @@ acure_ice_width
 acure_mp_dz_scal
 
 [namelist: run_radiation]
-bparam
-two_d_fsd_factor
+acure_bparam
+acure_two_d_fsd_factor
 
 [namelist: run_cloud]
-dbsdtbs_turb_0
+acure_dbsdtbs_turb_0
 
 [namelist: run_stochastic]
-m_ci
-a_ent_1_rp
+acure_m_ci
+acure_a_ent_1_rp
 
 [namelist: run_precip]
-c_r_correl
-ai
+acure_c_r_correl
+acure_ai

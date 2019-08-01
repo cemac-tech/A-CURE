@@ -14,7 +14,7 @@ with open("./acure.txt") as f:
         line=line.strip()
         var_lst.append(line)
 
-j=850
+j=950
 
 out=open("./acure_meta.conf","w")
 
@@ -94,7 +94,7 @@ for var in var_lst:
     out3.write('WRITE(lineBuffer,\'(A,L1)\')\'  l_%s = \', l_%s\n' % (var,var))
     out3.write('CALL umPrint(lineBuffer,src=\'ukca_option_mod\')\n')
     out3.write('WRITE(lineBuffer,\'(A,F16.4)\')\' %s = \',   %s\n' % (var,var))
-    out3.write('CALL umPrint(lineBuffer,src=\'ukca_option_mod\'))\n')
+    out3.write('CALL umPrint(lineBuffer,src=\'ukca_option_mod\')\n')
 
 out3.write('\n\nInsert the following in \"TYPE my_namelist"\n\n')
 
@@ -124,6 +124,6 @@ for var in var_lst:
 out3.write('\n\n')
 
 for var in var_lst:
-    out3.write('  %s = my_nml %% l_%s\n' % (var,var))
+    out3.write('  l_%s = my_nml %% l_%s\n' % (var,var))
 
 out3.close()

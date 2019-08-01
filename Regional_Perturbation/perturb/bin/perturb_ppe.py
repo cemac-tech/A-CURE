@@ -19,7 +19,7 @@ Required Arguments:
     output : location of the optional configuration files folder
     data   : location of the PPE dataframe, arranged with variables as column headers
              and one row per ensemble member, row indices used as the ensemble identifier
-             and the character "x" in cells where the variable is not used for that ensemble
+             and the character "x" in cells where the variable is not used for that ensemble member
 
 '''
 import sys
@@ -53,15 +53,18 @@ def file_val(fname,head,path_data):
     h,j,k,m=0,0,0,0
     headlog=[]
     for e in head:
-        if not re.match("acure",e):
-            headlog.append("l_acure_"+e+"=.false.")
-        else:
+        if re.search("_region_",e) is not None:
+            continue
+        elif re.search("acure",e) is not None:
             headlog.append("l_"+e+"=.false.")
+        else:
+            headlog.append("l_acure_"+e+"=.false.")
+
     pattern=re.compile('|'.join(headlog))
     with open(fname) as f:
         for i, l in enumerate(f, 1):
-            if re.match("^\[namelist:([^\]]*?)\]",l): j+=1
-            if re.match("^l_([^=]*?)=\.false\.$", l): h+=1
+            if re.match("\[namelist:([^\]]*?)\]",l): j+=1
+            if re.match("l_([^=]*?)=\.false\.$", l): h+=1
             if l=="\n": m+=1
             if pattern.search(l): k+=1
     if not h == i-j-m:
@@ -91,7 +94,9 @@ def subparam(ens_dict, source, dest):
     rep={}
 
     for name in ens_dict:
-        if re.match("acure",name):
+        if re.search("region",name) is not None:
+            continue
+        elif re.search("acure",name) is not None:
             rep["l_"+name+"=.false."]="l_"+name+"=.true."
         else:
             rep["l_acure_"+name+"=.false."]="l_acure_"+name+"=.true."
@@ -102,8 +107,11 @@ def subparam(ens_dict, source, dest):
         for line in fin:
 
             repl_flg=0
+            if len(rep)==0:
+                out=line
+            else:
+                out = pattern.sub(lambda match: rep[match.group(0)], line)
 
-            out = pattern.sub(lambda match: rep[match.group(0)], line)
             if not "\n" in out:
                 out = out + "\n"
                 if ".false." in out:
@@ -126,15 +134,54 @@ def subparam(ens_dict, source, dest):
                         outlst.insert(i+3,name+"_max="+val+"\n")
                     elif (name=="acure_bc_ri"):
                         outlst.insert(i+2,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
+
         with open(dest, 'w') as fout:
             for line in outlst:
                 fout.write("%s" % line)
     else:
-        for (name,val) in ens_dict.items():
-            print("%s=%s\n" % (name,val))
-        raise FileError('One or more of the expected parameters were not replaced.\n'
-                        + 'Expected to replace '+str(len(ens_dict))+' but replaced '
-                        + str(num_replaced)+" in " + dest + "\n")
+        if any("_region_" in key for key in ens_dict):
+            noreg = [key for key,value in ens_dict.items() if not "_region_" in key]
+            noreg_dict = {}
+            for k in noreg: noreg_dict.update({k:ens_dict[k]})
+            if num_replaced == len(noreg_dict):
+                for (name,val) in noreg_dict.items():
+                    teststr="_"+name+"="
+                    for i, line in enumerate(outlst):
+                        if teststr in line:
+                            if (name!="acure_carb_ff_ems" and
+                                name!="acure_carb_bb_ems" and
+                                name!="acure_carb_res_ems" and
+                                name!="acure_anth_so2"):
+                                outlst.insert(i+1,name+"="+val+"\n")
+                                if (name=="m_ci" or name=="a_ent_1_rp"):
+                                    outlst.insert(i+2,name+"_min="+val+"\n")
+                                    outlst.insert(i+3,name+"_max="+val+"\n")
+                                elif (name=="acure_bc_ri"):
+                                    outlst.insert(i+2,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
+                            else:
+                                temp_dict={}
+                                j=1
+                                regkeys=[key for key,value in ens_dict.items() if name+"_" in key]
+                                for k in regkeys: temp_dict.update({k:ens_dict[k]})
+                                for (name2,val2) in temp_dict.items():
+                                    outlst.insert(i+j,name2+"="+val2+"\n")
+                                    j +=1
+
+                with open(dest, 'w') as fout:
+                    for line in outlst:
+                        fout.write("%s" % line)
+            else:
+                for (name,val) in ens_dict.items():
+                    print("%s=%s\n" % (name,val))
+                raise FileError('One or more of the expected parameters were not replaced.\n'
+                                + 'Expected to replace '+str(len(ens_dict))+' but replaced '
+                                + str(num_replaced)+" in " + dest + "\n")
+        else:
+            for (name,val) in ens_dict.items():
+                print("%s=%s\n" % (name,val))
+            raise FileError('One or more of the expected parameters were not replaced.\n'
+                            + 'Expected to replace '+str(len(ens_dict))+' but replaced '
+                            + str(num_replaced)+" in " + dest + "\n")
 
 def check_int(s):
     s = str(s)
@@ -160,7 +207,7 @@ def main():
                         nargs="*",
                         type=int,
                         help='Space separated list of ensemble numbers',
-                        default=[3, 63])
+                        default=[7, 250])
 
     parser.add_argument('--output', '-o ',
                         type=str,
@@ -224,7 +271,11 @@ def main():
     if not len(chkset) == len(head):
         raise ArgumentsError("Duplicate values detected in the dataframe\n")
 
-    if file_val(conf_in,head,path_data) != df.shape[1]:
+    """
+    check that the number of records in the template file matched the number of columns in the Dataframe
+    22 columns are disregarded as these are regional values that are enabled or disabled by a single logical
+    """
+    if file_val(conf_in,head,path_data) != df.shape[1]-22:
         raise FileError("Mismatch between dataframe variable number in "+path_data+
                         " and template file "+conf_in +"\n")
 
@@ -266,9 +317,7 @@ def main():
             if newval != "x":
                 ens_dict[name]=newval
 
-
         subparam(ens_dict,conf_in,conf_out)
-
 
 
 if __name__ == '__main__':

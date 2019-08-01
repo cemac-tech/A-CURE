@@ -99,7 +99,7 @@ help= Perturbation regions for Biomass Burning Emissions used in A-CURE project
     = 3: Southern Hemisphere Africa (SHAF)
     = 4: Boreal Northern Hemisphere (BONA, BOAS)
     = 5: Rest of Northern Hemisphere (TENA, CEAM, NHSA, EURO, CEAS, SEAS, MIDE, NH-Marine)
-    = 5: Rest of Southern Hemisphere (EQAS, AUST, SH-Marine)
+    = 6: Rest of Southern Hemisphere (EQAS, AUST, SH-Marine)
 
 [stashmaster:code(303)]
 description=ACURE FF EMISS REGIONAL MASK
@@ -111,7 +111,7 @@ help= Perturbation regions for Fossil Fuel Emissions used in A-CURE project
     = 3: China
     = 4: Rest of Asia
     = 5: Marine
-    = 5: Rest of Globe
+    = 6: Rest of Globe
 
 [stashmaster:code(304)]
 description=ACURE RES EMISS REGIONAL MASK
