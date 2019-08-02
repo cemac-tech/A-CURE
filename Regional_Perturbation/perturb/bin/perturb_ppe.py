@@ -44,33 +44,149 @@ class FileError(Exception):
         sys.stderr.write('[FILE ERROR] : %s' % msg )
         sys.exit(9)
 
-def file_val(fname,head,path_data):
+def check_int(s):
+    s = str(s)
+    if s[0] in ('-', '+'):
+        return s[1:].isdigit()
+    return s.isdigit()
+
+def input_val(args):
     '''
-    Returns number of lines in file which are not namelist block header lines
-    Also verifies that the template.conf file has the correct format and has all
-    correct variables present
+    Returns the validated variables obtained through processing the input
+    arguments.
+    Args:
+        args (list): List of arguments from arg parser
+    Returns:
+        conf_in (str)         : path of input file with filename
+        path_out (str)        : path of output file, directory only
+        df (pandas dataframe) : dataframe of ensemble member ppe values
+        ens_lst (list)        : requested ensemble members
+    '''
+
+    # Validate the input path_in and generate conf_in
+
+    path_in = args.input
+    if not os.path.exists(path_in):
+        raise ArgumentsError('Path to template namelist file does not exist: '
+                             + path_in)
+
+    if os.path.isdir(path_in):
+        conf_in = os.path.join(path_in, 'template.conf')
+    else:
+        conf_in=path_in
+        path_in=os.path.split(conf_in)[0]
+
+    if not os.path.exists(conf_in):
+        raise ArgumentsError('Template namelist file does not exist: ' + conf_in +"\n")
+
+    # Validate the output path, or generate it from default value
+
+    if args.output==".":
+        path_out=os.path.join(path_in, 'opt')
+    else:
+        path_out=args.output
+
+    if not os.path.exists(path_out):
+        raise ArgumentsError('Directory to write opt conf file(s) to'
+                             + ' does not exist\n')
+
+    if path_out and not os.path.isdir(path_out):
+        raise ArgumentsError('Directory to write opt conf file(s) to'
+                             + ' does not exist\n')
+
+    # Validate location of PPE dataframe
+
+    if args.data==".":
+        path_data=os.path.join(path_in, 'ppe_dataframe.csv')
+    else:
+        path_data=args.data
+
+    if not os.path.exists(path_data):
+        raise ArgumentsError('PPE dataframe csv file does not exist: ' + path_data +"\n")
+
+    # Load PPE csv file into pandas dataframe
+
+    try:
+        df = pd.read_csv(path_data)
+    except:
+        raise FileError("Cannot open the dataframe file "+path_data)
+
+    head=list(df)
+    chkset=set(head) # Ensure no duplicates in header of dataframe
+    if not len(chkset) == len(head):
+        raise ArgumentsError("Duplicate values detected in the dataframe\n")
+
+    # Validate that the csv file and the template file are compatible
+    # 22 columns are disregarded as these are regional values that are enabled or disabled in groups
+
+    k=file_val(conf_in,head)
+    if k != df.shape[1]-22:
+        raise FileError("Number of non-regional variables in "+path_data+" file not as expected\n"+
+                        str(k)+" non-regional variables found in both"+conf_in+" and csv file but "+
+                        str(df.shape[1]-22)+" variables with 22 regional variables found\n")
+
+    # Validate the list of requested ensemble members
+
+    ens_lst = args.ens
+    chkset=set(ens_lst)
+    if not len(chkset) == len(ens_lst):
+        raise ArgumentsError("Duplicate values detected in the ensemble list\n")
+
+    if len(ens_lst) > df.shape[0]:
+        raise ArgumentsError("More ensemble members requested than exist within dataframe\n")
+
+    for ens in ens_lst:
+
+        # Check each requested ensemble member exists, is an integer, and is within the bounds of the dataframe
+
+        if not check_int(ens):
+            raise ArgumentsError("Non-integer ensemble indices detected in ensemble member list")
+        ens_int_val=int(ens)
+        if ens_int_val < 0:
+            raise ArgumentsError("Negative ensemble member index detected in ensemble member list")
+        if ens_int_val > df.shape[0]:
+            raise ArgumentsError("Ensemble index detected which is larger than maximum")
+        if not ens in df.index:
+            raise ArgumentsError('Ensemble member '+str(ens)+' not found in dataframe\n')
+
+    return path_out, conf_in, df, ens_lst
+
+def file_val(fname,head):
+    '''
+    Returns number of lines in file template which are not namelist block header
+    lines or blank lines. Also verifies that the template.conf file has the
+    correct format and has all correct variables present, not counting regional
+    perturbation variables.
+    Args:
+        fname (str): name and path of the template file
+        head (list): header line of the ppe dataframe as read from csv file
     '''
     h,j,k,m=0,0,0,0
     headlog=[]
     for e in head:
         if re.search("_region_",e) is not None:
+            # Don't count the regional perturbations
             continue
         elif re.search("acure",e) is not None:
+            # for all acure only parameters
             headlog.append("l_"+e+"=.false.")
         else:
+            # for the pre-existing parameters
             headlog.append("l_acure_"+e+"=.false.")
 
     pattern=re.compile('|'.join(headlog))
     with open(fname) as f:
         for i, l in enumerate(f, 1):
-            if re.match("\[namelist:([^\]]*?)\]",l): j+=1
-            if re.match("l_([^=]*?)=\.false\.$", l): h+=1
-            if l=="\n": m+=1
-            if pattern.search(l): k+=1
+            if re.match("\[namelist:([^\]]*?)\]",l): j+=1 #namelist headers
+            if re.match("l_([^=]*?)=\.false\.$", l): h+=1 #logical placeholders
+            if l=="\n": m+=1                              #blank lines
+            if pattern.search(l): k+=1                    #lines matching csv header fields
+
     if not h == i-j-m:
         raise FileError(str(i-j-h-m)+" entries in the template file had wrong format.\n"
                         +"Entries should be assignment of false to logical switches"
                         +" for every PPE variable or namelist block headers.\n")
+
     if not h == k:
         raise FileError("Mismatch between dataframe variable values in "+path_data+
                         " and template file "+fname+" in "+str(h-k)+" entries.\n")
@@ -95,10 +211,13 @@ def subparam(ens_dict, source, dest):
 
     for name in ens_dict:
         if re.search("region",name) is not None:
+            #Skip the regional variables as no one-to-one associated logical
             continue
         elif re.search("acure",name) is not None:
+            # Standard acure only variables
             rep["l_"+name+"=.false."]="l_"+name+"=.true."
         else:
+            # Pre-existing variables
             rep["l_acure_"+name+"=.false."]="l_acure_"+name+"=.true."
 
     pattern = re.compile("|".join(rep.keys()))
@@ -108,15 +227,19 @@ def subparam(ens_dict, source, dest):
 
             repl_flg=0
             if len(rep)==0:
+                #To handle exception where ens_dict has no replacement values
                 out=line
             else:
+                # substitute logical values based on contents of ens_dict
                 out = pattern.sub(lambda match: rep[match.group(0)], line)
 
             if not "\n" in out:
+                # Prevent a line without a \n character being treated as a replacement
                 out = out + "\n"
                 if ".false." in out:
                     num_replaced -=1
 
+            #Outlst used to build up the entries in the output conf file
             outlst.append(out)
             if out != line:
                 num_replaced += 1
@@ -124,30 +247,50 @@ def subparam(ens_dict, source, dest):
                 print (out)
 
     if num_replaced == len(ens_dict):
+
+        # Compatibility between template conf file and ensemble parameter set
+        # No regional perturbations, as these have 5 or 6 parameters controlled
+        # by a single logical switch.
+
         for (name,val) in ens_dict.items():
             teststr="_"+name+"="
             for i, line in enumerate(outlst):
                 if teststr in line:
                     outlst.insert(i+1,name+"="+val+"\n")
+                    #adds new value for parameter to output conf file
                     if (name=="m_ci" or name=="a_ent_1_rp"):
+                        # Special cases where min and max values are set to the same as the parameter
                         outlst.insert(i+2,name+"_min="+val+"\n")
                         outlst.insert(i+3,name+"_max="+val+"\n")
                     elif (name=="acure_bc_ri"):
+                        # Special case where a pcalc particular to bc_ri is set for each value of bc_ri.
+                        # This might change however and be replaced with a different pcalc index in later versions
                         outlst.insert(i+2,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
 
+        # Write out the output opt conf file
         with open(dest, 'w') as fout:
             for line in outlst:
                 fout.write("%s" % line)
+
     else:
+
+        # Regional perturbations exist, throwing off the compatibility between
+        # template conf file and ensemble parameter set.
+
         if any("_region_" in key for key in ens_dict):
             noreg = [key for key,value in ens_dict.items() if not "_region_" in key]
             noreg_dict = {}
             for k in noreg: noreg_dict.update({k:ens_dict[k]})
+            # Set a dict of parameters without the regional parameter values
+            # Allowing compatibility check between template conf file and
+            # the ensemble member parameter set
             if num_replaced == len(noreg_dict):
                 for (name,val) in noreg_dict.items():
                     teststr="_"+name+"="
                     for i, line in enumerate(outlst):
                         if teststr in line:
+                            # Proceed as before if not one of the regional perturbation
+                            # special case variables
                             if (name!="acure_carb_ff_ems" and
                                 name!="acure_carb_bb_ems" and
                                 name!="acure_carb_res_ems" and
@@ -159,6 +302,8 @@ def subparam(ens_dict, source, dest):
                                 elif (name=="acure_bc_ri"):
                                     outlst.insert(i+2,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
                             else:
+                                # Add the regional perturbation values rather than the indicator
+                                # variable value
                                 temp_dict={}
                                 j=1
                                 regkeys=[key for key,value in ens_dict.items() if name+"_" in key]
@@ -171,26 +316,23 @@ def subparam(ens_dict, source, dest):
                     for line in outlst:
                         fout.write("%s" % line)
             else:
+                # Handle a mismatch between the template conf file and ensemble member
+                # parameter list
                 for (name,val) in ens_dict.items():
                     print("%s=%s\n" % (name,val))
                 raise FileError('One or more of the expected parameters were not replaced.\n'
                                 + 'Expected to replace '+str(len(ens_dict))+' but replaced '
                                 + str(num_replaced)+" in " + dest + "\n")
         else:
+            # Handle a mismatch between the template conf file and ensemble member
+            # parameter list
             for (name,val) in ens_dict.items():
                 print("%s=%s\n" % (name,val))
             raise FileError('One or more of the expected parameters were not replaced.\n'
                             + 'Expected to replace '+str(len(ens_dict))+' but replaced '
                             + str(num_replaced)+" in " + dest + "\n")
 
-def check_int(s):
-    s = str(s)
-    if s[0] in ('-', '+'):
-        return s[1:].isdigit()
-    return s.isdigit()
-
-
-def main():
+def main():_
     ''' Main function '''
 
     parser = argparse.ArgumentParser(description=(
@@ -207,7 +349,7 @@ def main():
                         nargs="*",
                         type=int,
                         help='Space separated list of ensemble numbers',
-                        default=[7, 250])
+                        default=[0, 7, 250])
 
     parser.add_argument('--output', '-o ',
                         type=str,
@@ -226,76 +368,11 @@ def main():
     print("Dataframe Location : %s" % args.data)
     print("Ensemble Indices   : %s" % args.ens)
 
-    """
-    Check the input Arguments
-    """
+    #Check the input Arguments
 
-    path_in = args.input
-    if not os.path.exists(path_in):
-        raise ArgumentsError('Path to template namelist file does not exist: '
-                             + path_in)
-
-    if os.path.isdir(path_in):
-        conf_in = os.path.join(path_in, 'template.conf')
-    else:
-        conf_in=path_in
-
-    if not os.path.exists(conf_in):
-        raise ArgumentsError('Template namelist file does not exist: ' + conf_in +"\n")
-
-    path_out = args.output
-
-    if args.output==".":
-        path_out=os.path.join(path_in, 'opt')
-    else:
-        path_out=args.output
-
-    if not os.path.exists(path_out):
-        raise ArgumentsError('Directory to write opt conf file to'
-                             + ' does not exist\n')
-    if args.data==".":
-        path_data=os.path.join(path_in, 'ppe_dataframe.csv')
-    else:
-        path_data=args.data
-
-    if not os.path.exists(path_data):
-        raise ArgumentsError('PPE dataframe csv file does not exist: ' + path_data +"\n")
-
-    try:
-        df = pd.read_csv(path_data)
-    except:
-        raise FileError("Cannot open the dataframe file "+path_data)
-
-    head=list(df)
-    chkset=set(head)
-    if not len(chkset) == len(head):
-        raise ArgumentsError("Duplicate values detected in the dataframe\n")
-
-    """
-    check that the number of records in the template file matched the number of columns in the Dataframe
-    22 columns are disregarded as these are regional values that are enabled or disabled by a single logical
-    """
-    if file_val(conf_in,head,path_data) != df.shape[1]-22:
-        raise FileError("Mismatch between dataframe variable number in "+path_data+
-                        " and template file "+conf_in +"\n")
-
-    ens_lst = args.ens
-    chkset=set(ens_lst)
-    if not len(chkset) == len(ens_lst):
-        raise ArgumentsError("Duplicate values detected in the ensemble list\n")
-
-    if len(ens_lst) > df.shape[0]:
-        raise ArgumentsError("More ensemble members requested than exist within dataframe\n")
+    path_out, conf_in, df, ens_lst = input_val(args)
 
     for ens in ens_lst:
-
-        if not check_int(ens):
-            raise ArgumentsError("Non-integer ensemble indices detected in ensemble member list")
-        ens_int_val=int(ens)
-        if ens_int_val < 0:
-            raise ArgumentsError("Negative ensemble member index detected in ensemble member list")
-        if ens_int_val > df.shape[0]:
-            raise ArgumentsError("Ensemble index detected which is larger than maximum")
 
         conf_out = os.path.join(path_out, 'rose-app-ens_' + str(ens) +'.conf' )
 
@@ -303,13 +380,6 @@ def main():
             print('Output conf file already exists, will not overwrite: '
                   + conf_out +"\n Skipping this ensemble member.\n")
             continue
-        else:
-            if path_out and not os.path.isdir(path_out):
-                raise ArgumentsError('Directory to write ' + conf_out
-                                     + ' does not exist')
-
-        if not ens in df.index:
-            raise ArgumentsError('Ensemble member '+str(ens)+' not found in dataframe\n')
 
         row=df.iloc[ens].to_dict()
         ens_dict={}
@@ -318,7 +388,6 @@ def main():
                 ens_dict[name]=newval
 
         subparam(ens_dict,conf_in,conf_out)
-
 
 if __name__ == '__main__':
     main()
