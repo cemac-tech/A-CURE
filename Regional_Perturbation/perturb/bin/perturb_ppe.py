@@ -295,12 +295,14 @@ def subparam(ens_dict, source, dest):
                                 name!="acure_carb_bb_ems" and
                                 name!="acure_carb_res_ems" and
                                 name!="acure_anth_so2"):
-                                outlst.insert(i+1,name+"="+val+"\n")
+                                if (name=="acure_pcalc_index"):
+                                    outlst.insert(i+1,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
+                                else:
+                                    outlst.insert(i+1,name+"="+val+"\n")
                                 if (name=="m_ci" or name=="a_ent_1_rp"):
                                     outlst.insert(i+2,name+"_min="+val+"\n")
                                     outlst.insert(i+3,name+"_max="+val+"\n")
-                                elif (name=="acure_bc_ri"):
-                                    outlst.insert(i+2,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
+
                             else:
                                 # Add the regional perturbation values rather than the indicator
                                 # variable value
