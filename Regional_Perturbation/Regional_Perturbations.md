@@ -251,4 +251,10 @@ UkcaD1Codes(j+44)%len_dim2=rows
 IF (.NOT. l_acure_carb_res_ems) UkcaD1Codes(j+44)%required=.FALSE.
 ```
 
-This will add the regions to the UkcaD1Codes array at index `j=dtn_dim + n_dust_emissions + 41`. The presence of the prognostics can be confirmed by setting the PRINT_STATUS in `um/env/Runtime Controls/Atmosphere only` in the rose GUI to "Extra diagnostic messages" and examining the output from the cylc run in the `cylc-run/<suite-id>/log/job/<date stamp>/atmos_main` folder on puma.
+This will add the regions to the UkcaD1Codes array at index `j=dtn_dim + n_dust_emissions + 41`. The presence of the prognostics can be confirmed by setting the PRINT_STATUS in `um/env/Runtime Controls/Atmosphere only` in the rose GUI to "Extra diagnostic messages" and examining the output from the cylc run in the `cylc-run/<suite-id>/log/job/<date stamp>/atmos_main` folder on puma. It should be noted however that an issue caused by a write statement in EasyAerosol and triggered at more verbose levels of output will cause the atmos_main task to crash. This can be fixed in the file `src/atmosphere/radiation_control/easyaerosol_read_input_mod.F90:1497` with the following change:
+
+```
+--          DO k = 1, dimsize(4)
+
+++          DO k = 1, dimsize(3)
+```

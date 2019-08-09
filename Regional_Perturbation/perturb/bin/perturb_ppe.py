@@ -4,13 +4,14 @@
 Name: perturb_ppe.py
 
 Description:
-    Perturb a set parameter in the namelist by creating a new rose-app.conf
-    file in the app/um/opt folder. A directive in the suite.rc file points the
-    atmos_main task to the relevant altered rose-app.conf file. Values for the
-    parameter are determined by reading specific rows in a dataframe csv file
+    Overwrite a set of parameters in the um app by creating a new rose-app.conf
+    file in the app/um/opt folder, or custom alternative folder. A directive in
+    the suite.rc file points the atmos_main task to the relevant altered
+    rose-app.conf file. Values for the parameters are determined by reading
+    specific rows in a dataframe csv file
 
 Required Arguments:
-    input  : location of template configuration file, referred to as CONF_LOC by cylc.
+    input  : location of template configuration file, referred to as TMPL_LOC by cylc.
              Template file is to contain every parameter to be perturbed as a
              logical set to false, as each parameter has an associated logical in the
              um namelists.
@@ -43,12 +44,6 @@ class FileError(Exception):
     def __init__(self,msg):
         sys.stderr.write('[FILE ERROR] : %s' % msg )
         sys.exit(9)
-
-def check_int(s):
-    s = str(s)
-    if s[0] in ('-', '+'):
-        return s[1:].isdigit()
-    return s.isdigit()
 
 def input_val(args):
     '''
@@ -139,7 +134,7 @@ def input_val(args):
 
         # Check each requested ensemble member exists, is an integer, and is within the bounds of the dataframe
 
-        if not check_int(ens):
+        if not isinstance(ens, int):
             raise ArgumentsError("Non-integer ensemble indices detected in ensemble member list")
         ens_int_val=int(ens)
         if ens_int_val < 0:
@@ -164,7 +159,10 @@ def file_val(fname,head):
     h,j,k,m=0,0,0,0
     headlog=[]
     for e in head:
-        if re.search("_region_",e) is not None:
+        if re.search("_ems_",e) is not None:
+            # Don't count the regional perturbations
+            continue
+        elif re.search("_so2_",e) is not None:
             # Don't count the regional perturbations
             continue
         elif re.search("acure",e) is not None:
@@ -210,7 +208,10 @@ def subparam(ens_dict, source, dest):
     rep={}
 
     for name in ens_dict:
-        if re.search("region",name) is not None:
+        if re.search("_ems_",name) is not None:
+            #Skip the regional variables as no one-to-one associated logical
+            continue
+        elif re.search("_so2_",name) is not None:
             #Skip the regional variables as no one-to-one associated logical
             continue
         elif re.search("acure",name) is not None:
@@ -256,16 +257,16 @@ def subparam(ens_dict, source, dest):
             teststr="_"+name+"="
             for i, line in enumerate(outlst):
                 if teststr in line:
-                    outlst.insert(i+1,name+"="+val+"\n")
-                    #adds new value for parameter to output conf file
-                    if (name=="m_ci" or name=="a_ent_1_rp"):
-                        # Special cases where min and max values are set to the same as the parameter
-                        outlst.insert(i+2,name+"_min="+val+"\n")
-                        outlst.insert(i+3,name+"_max="+val+"\n")
-                    elif (name=="acure_bc_ri"):
-                        # Special case where a pcalc particular to bc_ri is set for each value of bc_ri.
-                        # This might change however and be replaced with a different pcalc index in later versions
-                        outlst.insert(i+2,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
+                    if (name=="acure_pcalc_index"):
+                        # Special case where a pcalc file is selected by modifying the string for ukcaprec to include the pcalc_index (special case 2 above)
+                        outlst.insert(i+1,"ukcaperc=/work/n02/n02/lre/pcalc_UKESM_11_1_default/RADAER_pcalc_"+val+".ukca\n")
+                    else:
+                        outlst.insert(i+1,name+"="+val+"\n")
+                        #adds new value for parameter to output conf file
+                        if (name=="m_ci" or name=="a_ent_1_rp"):
+                            # Special cases where min and max values are set to the same as the parameter
+                            outlst.insert(i+2,name+"_min="+val+"\n")
+                            outlst.insert(i+3,name+"_max="+val+"\n")
 
         # Write out the output opt conf file
         with open(dest, 'w') as fout:
@@ -277,8 +278,9 @@ def subparam(ens_dict, source, dest):
         # Regional perturbations exist, throwing off the compatibility between
         # template conf file and ensemble parameter set.
 
-        if any("_region_" in key for key in ens_dict):
-            noreg = [key for key,value in ens_dict.items() if not "_region_" in key]
+        if (any("_ems_" in key for key in ens_dict) or
+           any("_so2_" in key for key in ens_dict)):
+            noreg = [key for key,value in ens_dict.items() if ((not "_so2_" in key) and (not "_ems_" in key))]
             noreg_dict = {}
             for k in noreg: noreg_dict.update({k:ens_dict[k]})
             # Set a dict of parameters without the regional parameter values
@@ -334,7 +336,7 @@ def subparam(ens_dict, source, dest):
                             + 'Expected to replace '+str(len(ens_dict))+' but replaced '
                             + str(num_replaced)+" in " + dest + "\n")
 
-def main():_
+def main():
     ''' Main function '''
 
     parser = argparse.ArgumentParser(description=(

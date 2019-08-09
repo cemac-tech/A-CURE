@@ -14,7 +14,7 @@ with open("./acure.txt") as f:
         line=line.strip()
         var_lst.append(line)
 
-j=950
+j=850
 
 out=open("./acure_meta.conf","w")
 
