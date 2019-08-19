@@ -4,75 +4,383 @@ To implement the ensemble changes into the AMIP suite (which uses UM vn11.1 curr
 
 The changes made to the rose-meta.conf and rose-suite.conf files described in the previous section [here](../Ensemble_Generation_2/Part3-Extend_to_dataframe.md) were copied over into the AMIP versions of these files, as was the changes to the suite.rc file allowing non-sequential ensemble numbers and dataframes to be used.
 
-To ensure that when ensembling is not required the suite will still run and PPE variables can be still set, a number of conditional statements have been included in the suite.rc file, as shown below:
+To ensure that when ensembling is not required the suite will still run and PPE variables can be still set, a number of conditional statements have been included in the suite.rc file. The parameterisation was also extended to the post processing and housekeeping tasks, as shown below first for the construction of the cylc graph and dependencies, and secondly for the definition of the tasks
 
-```ini
+```
+
 {% if ENS_LOG %}
 [[parameters]]
     ens = {{ ENS_COMB | join(', ') }}
+    {# Creates the list of ensemble members #}
+[[parameter templates]]
+    ens = %(ens)03d        
+    {# defines the formatting for the ensemble members #}
 {% endif %}
 
-...
+     :
+     :
 
 {% if SITE == 'archer' %}
 [[queues]]
     [[[default]]]
-        limit=28
+        limit=16
 {% endif %}
 
-...
+{# Define the special tasks, ie those which automatically depend on their #}
+{# previous cycle #}
 
-{% if ENS_LOG %}
-{% set BUILD_GRAPH = BUILD_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else BUILD_GRAPH %}
-{% else %}
-{% set BUILD_GRAPH = BUILD_GRAPH ~ ' => atmos_main' if TASK_RUN else BUILD_GRAPH %}
-{% endif %}
-
-...
-
-{% if ENS_LOG %}
-{% set INIT_GRAPH = INIT_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else INIT_GRAPH %}
-{% else %}
-{% set INIT_GRAPH = INIT_GRAPH ~ ' => atmos_main' if TASK_RUN else INIT_GRAPH %}
-{% endif %}
-
-...
-
-[[[ {{EXPT_RESUB}} ]]]
+[[special tasks]]
     {% if ENS_LOG %}
-    graph = atmos_main<ens> => {{ RESUB_GRAPH }}
+    sequential = atmos_main<ens>, postproc<ens>, archive_integrity<ens>, &
+                 pptransfer<ens>, supermean<ens>, housekeeping<ens>, &
+                 rose_arch_logs<ens>
     {% else %}
-    graph = atmos_main => {{ RESUB_GRAPH }}
+    sequential = atmos_main, postproc, archive_integrity, pptransfer, &
+                 supermean, housekeeping, rose_arch_logs
     {% endif %}
 
-{% if TASK_ARCH_WALL %}
-[[[ R1//^+{{EXPT_RUNLEN}}-{{EXPT_RESUB}} ]]]
+[[dependencies]]
+
+    {# Set up build graph #}
+    {% if TASK_BUILD_UM %}
+    {% set BUILD_GRAPH = 'fcm_make_um' %}
+    {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => fcm_make2_um' if SITE in DBLE_FCMUM
+                                            else BUILD_GRAPH %}
+    {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => recon' if TASK_RECON else BUILD_GRAPH %}
+
+    {# set dependencies for ensemble tasks #}
+
     {% if ENS_LOG %}
-    graph = atmos_main<ens> => rose_arch_wallclock => housekeeping
+    {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN else BUILD_GRAPH %}
     {% else %}
-    graph = atmos_main => rose_arch_wallclock => housekeeping
+    {% set BUILD_GRAPH = BUILD_GRAPH ~ ' => atmos_main' if TASK_RUN else BUILD_GRAPH %}
     {% endif %}
+
+    [[[ R1 ]]]
+        graph = {{ BUILD_GRAPH }}
+
+    {# Set up first cycle graph #}
+    {% set INIT_GRAPH = 'install_cold => install_ancil' %}
+    {% set INIT_GRAPH = INIT_GRAPH ~ ' => recon' if TASK_RECON else INIT_GRAPH %}
+
+    {# Same as for build graph #}
+
+    {% if ENS_LOG %}
+    {% set INIT_GRAPH = INIT_GRAPH ~ ' => perturb => atmos_main<ens>' if TASK_RUN
+                                          else INIT_GRAPH %}
+    {% else %}
+    {% set INIT_GRAPH = INIT_GRAPH ~ ' => atmos_main' if TASK_RUN else INIT_GRAPH %}
+    {% endif %}
+
+    [[[ R1 ]]]
+        graph = {{ INIT_GRAPH }}
+
+    {% if TASK_RUN %}
+
+    {# Set up postproc and pptransfer with or without ensembling #}
+    {% if TASK_POSTPROC %}
+    [[[ R1 ]]]
+        {% if ENS_LOG %}
+        graph = fcm_make_pp => fcm_make2_pp => postproc<ens>
+        {% else %}
+        graph = fcm_make_pp => fcm_make2_pp => postproc
+        {% endif %}
+    {% if TASK_PPTRANSFER %}
+    [[[ R1 ]]]
+        {% if ENS_LOG %}
+        graph = fcm_make_pptransfer => fcm_make2_pptransfer => pptransfer<ens>
+        {% else %}
+        graph = fcm_make_pptransfer => fcm_make2_pptransfer => pptransfer
+        {% endif %}
+    {% endif %}
+    {% endif %}
+
+    {# Set up archive integrity checking if defined and enabled for both the #}
+    {# testing only case and resubmission #}
+    {% if TASK_ARCHIVE_INTEGRITY is defined %}
+    {% if TASK_ARCHIVE_INTEGRITY %}
+    [[[ {{EXPT_RESUB_ARCHIVE_INTEGRITY}} ]]]
+        {% if ENS_LOG %}
+        graph = postproc<ens> => archive_integrity<ens> => housekeeping<ens>
+        {% else %}
+        graph = postproc => archive_integrity => housekeeping
+        {% endif %}
+    [[[ R1//^+{{EXPT_RUNLEN}}-{{EXPT_RESUB}} ]]]
+        {% if ENS_LOG %}
+        graph = postproc<ens> => archive_integrity<ens> => housekeeping<ens>
+        {% else %}
+        graph = postproc => archive_integrity => housekeeping
+        {% endif %}
+    {% endif %}
+    {% endif %}
+
+    {# Set up cycling graph, adding each post processing task in turn if enabled#}
+    {% set RESUB_GRAPH = '' %}
+
+    {% if ENS_LOG %}
+
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'postproc<ens> => '
+                                       if TASK_POSTPROC else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'pptransfer<ens> => '
+                                       if TASK_PPTRANSFER else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'supermean<ens> => '
+                                       if TASK_SUPERMEAN else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'rose_arch_logs<ens> => '
+                                       if TASK_ARCH_LOG else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'housekeeping<ens>' %}
+
+    {% else %}
+
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'postproc => '
+                                       if TASK_POSTPROC else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'pptransfer => '
+                                       if TASK_PPTRANSFER else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'supermean => '
+                                       if TASK_SUPERMEAN else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'rose_arch_logs => '
+                                       if TASK_ARCH_LOG else RESUB_GRAPH %}
+    {% set RESUB_GRAPH = RESUB_GRAPH ~ 'housekeeping' %}
+
+    {% endif %}
+
+
+    [[[ {{EXPT_RESUB}} ]]]
+        {% if ENS_LOG %}
+        graph = atmos_main<ens> => {{ RESUB_GRAPH }}
+        {% else %}
+        graph = atmos_main => {{ RESUB_GRAPH }}
+        {% endif %}
+
+    {% if TASK_ARCH_WALL %}
+    [[[ R1//^+{{EXPT_RUNLEN}}-{{EXPT_RESUB}} ]]]
+        {% if ENS_LOG %}
+        graph = atmos_main<ens> => rose_arch_wallclock => housekeeping
+        {% else %}
+        graph = atmos_main => rose_arch_wallclock => housekeeping
+        {% endif %}
+    {% endif %}
+
+    {# Include tests graph if required #}
+    {% if TASK_TESTS %}
+    %include suite-tests-graph.rc
+    {% endif %}
+
+    {% endif %}
+
+```
+Note that for readability some linebreaks have been added. These are not present in the suite.rc file. Below the ensembled tasks are defined, and presented alongside their non-ensembling counterparts. Each ensembling task :
+
+```
+[[RUN_MAIN]]
+    [[[environment]]]
+        DATAM = $ROSE_DATA/{{DATAM}}
+
+{% if ENS_LOG %}
+[[PPE_MEMB<ens>]]
+    [[[environment]]]
+        DATAM=${ROSE_DATA}/{{DATAM}}/ens_${CYLC_TASK_PARAM_ens}
 {% endif %}
 
-...
+          :
+          :
+          :
+
+[[perturb]]
+    inherit = RUN_MAIN, PERTURB_RESOURCE
+    script = "rose task-run --app-key=perturb --verbose"
+    [[[environment]]]
+        ENS_LST={{ ENS_COMB | join(' ') }}
+        TMPL_LOC=${CYLC_SUITE_RUN_DIR}/{{ENS_TMPL}}
+        CONF_LOC=${CYLC_SUITE_RUN_DIR}/app/um/opt
+        DF_LOC=${CYLC_SUITE_RUN_DIR}/{{ENS_CSV}}
 
 [[atmos_main]]
     inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
     post-script = save_wallclock.sh {{EXPT_RESUB}}
+    [[[environment]]]  
+        ENS_MEMBER = 0
 
+{% if ENS_LOG %}
 [[atmos_main<ens>]]
-    inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
+    inherit = PPE_MEMB<ens>, ATMOS_RESOURCE, ATMOS
     post-script = save_wallclock.sh {{EXPT_RESUB}}
     [[[environment]]]
-        ROSE_APP_OPT_CONF_KEYS = ens_${CYLC_TASK_PARAM_ens} {{CONFIG_OPT}} {{BITCOMP_NRUN_OPT}}
-        DATAM=$ROSE_DATA/{{DATAM}}/ens_${CYLC_TASK_PARAM_ens}
+        ROSE_APP_OPT_CONF_KEYS = ens_${CYLC_TASK_PARAM_ens} {{CONFIG_OPT}}
+                                 {{BITCOMP_NRUN_OPT}}
         ENS_MEMBER=${CYLC_TASK_PARAM_ens}
+{% endif %}
 
+[[fcm_make_pp]]
+    inherit = RUN_MAIN, EXTRACT_RESOURCE
+[[fcm_make2_pp]]
+    inherit = RUN_MAIN, PPBUILD_RESOURCE
+
+[[POSTPROC]]
+    [[[environment]]]
+        CYCLEPERIOD = {{EXPT_RESUB}}
+
+[[postproc]]
+    inherit = RUN_MAIN, POSTPROC_RESOURCE, POSTPROC
+    [[[environment]]]
+        MODELBASIS = $BASIS_UM_PT
+        UMTASKNAME=atmos_main
+        ARCHIVE_SET = $CYLC_SUITE_NAME
+
+{% if ENS_LOG %}
+[[postproc<ens>]]
+    inherit = PPE_MEMB<ens>, POSTPROC_RESOURCE, POSTPROC
+    [[[environment]]]
+        MODELBASIS = $BASIS_UM_PT
+        ROSE_TASK_APP = postproc
+    [[[parameter environment templates]]]
+        UMTASKNAME=atmos_main%(ens)03d
+        ARCHIVE_SET=${CYLC_SUITE_NAME}_ens%(ens)03d
+{% endif %}
+
+[[fcm_make_pptransfer]]
+    inherit = RUN_MAIN, EXTRACT_RESOURCE
+    [[[environment]]]
+        ROSE_TASK_APP = fcm_make_pp
+[[fcm_make2_pptransfer]]
+    inherit = RUN_MAIN, PPTRANSFER_RESOURCE
+    [[[environment]]]
+        ROSE_TASK_APP = fcm_make_pp
+
+[[pptransfer]]
+    inherit = RUN_MAIN, PPTRANSFER_RESOURCE
+    [[[environment]]]
+        CYCLEPERIOD = {{EXPT_RESUB}}
+        ROSE_TASK_APP = postproc
+        UMTASKNAME=atmos_main
+        ARCHIVE_SET = $CYLC_SUITE_NAME
+
+{% if ENS_LOG %}
+[[pptransfer<ens>]]
+    inherit = PPE_MEMB<ens>, PPTRANSFER_RESOURCE
+    [[[environment]]]
+        CYCLEPERIOD = {{EXPT_RESUB}}
+        ROSE_TASK_APP = postproc
+    [[[parameter environment templates]]]
+        UMTASKNAME=atmos_main%(ens)03d
+        ARCHIVE_SET=${CYLC_SUITE_NAME}_ens%(ens)03d
+{% endif %}
+
+[[supermean]]
+    inherit = RUN_MAIN, SUPERMEAN_RESOURCE, POSTPROC
+    [[[environment]]]
+        BASIS = $({{ROSEDATE}} {{EXPT_BASIS}})
+        TCYCLE = $({{ROSEDATE}} ref)
+        NCYCLE = $({{ROSEDATE}} --offset={{EXPT_RESUB}} ref)
+        ARCHIVE_SET = $CYLC_SUITE_NAME
+
+{% if ENS_LOG %}
+[[supermean<ens>]]
+    inherit = PPE_MEMB<ens>, SUPERMEAN_RESOURCE, POSTPROC
+    [[[environment]]]
+        BASIS = $({{ROSEDATE}} {{EXPT_BASIS}})
+        TCYCLE = $({{ROSEDATE}} ref)
+        NCYCLE = $({{ROSEDATE}} --offset={{EXPT_RESUB}} ref)
+        ROSE_TASK_APP = supermean
+    [[[parameter environment templates]]]
+        ARCHIVE_SET=${CYLC_SUITE_NAME}_ens%(ens)03d
+{% endif %}
+
+[[archive_integrity]]
+    inherit = RUN_MAIN, POSTPROC_RESOURCE, POSTPROC
+    [[[job]]]
+        execution time limit = PT20M
+        execution retry delays = 3*PT1H
+    [[[environment]]]
+        ROSE_TASK_APP = postproc
+        ROSE_APP_COMMAND_KEY = verify
+        UMTASKNAME = atmos_main
+        ARCHIVE_SET = $CYLC_SUITE_NAME
+
+{% if ENS_LOG %}
+[[archive_integrity<ens>]]
+    inherit = PPE_MEMB<ens>, POSTPROC_RESOURCE, POSTPROC
+    [[[job]]]
+        execution time limit = PT20M
+        execution retry delays = 3*PT1H
+    [[[environment]]]
+        ROSE_TASK_APP = postproc
+        ROSE_APP_COMMAND_KEY = verify
+    [[[parameter environment templates]]]
+        UMTASKNAME=atmos_main%(ens)03d
+        ARCHIVE_SET=${CYLC_SUITE_NAME}_ens%(ens)03d
+{% endif %}
+
+[[rose_arch_logs]]
+    inherit = RUN_MAIN, LOGS_RESOURCE
+    [[[environment]]]
+        ROSE_APP_OPT_CONF_KEYS = logs
+        ROSE_TASK_APP = rose_arch
+
+{% if ENS_LOG %}
+[[rose_arch_logs<ens>]]
+    inherit = PPE_MEMB<ens>, LOGS_RESOURCE
+    [[[environment]]]
+        ROSE_APP_OPT_CONF_KEYS = logs
+        ROSE_TASK_APP = rose_arch
+{% endif %}
+
+[[rose_arch_wallclock]]
+    inherit = RUN_MAIN, WALLCLOCK_RESOURCE
+    [[[environment]]]
+        ROSE_APP_OPT_CONF_KEYS = wallclock
+        ROSE_TASK_APP = rose_arch
+
+{% if ENS_LOG %}
+[[rose_arch_wallclock<ens>]]
+    inherit = PPE_MEMB<ens>, WALLCLOCK_RESOURCE
+    [[[environment]]]
+        ROSE_APP_OPT_CONF_KEYS = wallclock
+        ROSE_TASK_APP = rose_arch
+{% endif %}
+
+[[housekeeping]]
+    inherit = RUN_MAIN, HOUSEKEEP_RESOURCE
+
+{% if ENS_LOG %}
+[[housekeeping<ens>]]
+    inherit = PPE_MEMB<ens>, HOUSEKEEP_RESOURCE
+    [[[environment]]]
+        ROSE_TASK_APP = housekeeping
+{% endif %}
 ```
 
-These conditional statements ensure that if ensembling is not enabled, the suite will still run as normal with no extra settings required and still be able to read in the PPE variables as set in the GUI.
+The conditional statements ensure that if ensembling is not enabled, the suite will still run as normal with no extra settings required and still be able to read in the PPE variables as set in the GUI.
 
+To keep the data separate and deposited into separate folders when archiving, every task after the perturb task has ensembled versions. For the vast majority of these ensembled versions the environment variables have been changed. For all of them, the `[[RUN_MAIN]]` task has been replaced with `[[PPE_MEMB<ens>]]` which defines the `{{DATAM}}` variable, and for many this and the addition of `<ens>` to the task name is the only substantial change. For the housekeeping and supermean tasks, an addition to define the `ROSE_TASK_APP` variable is needed as the task names `[[housekeeping<ens>]]` and `[[supermean<ens>]]` are not the same as the task names expected by and defined by rose. Others of the parameterised tasks, mainly from the post processing app, require definition of the ARCHIVE_SET and/or the UMTASKNAME variables. To ensure that these have the correct format, these variables are set under the subheading of `[[[parameter environment templates]]]`, which allows the <ens> value to be formatted.
 
-Work still pending includes:
-* Checking to see if post processing can work with ensembling - this is of vital importance
-* Testing with the AMIP suite
+The main change to the tasks, and the one which allows the perturbed atmosphere tasks to be run, is the addition of the redefinition of the `ROSE_APP_OPT_CONF_KEYS` variable in the `atmos_main<ens>` task. This variable is defined earlier as an environment variable in the `[[UM]]` family and passed through to the atmos_main task. In ensembling mode this variable is redefined to include the `rose-app-ens_<ens number>.conf` file as an optional configuration file which is the output of the perturb task. The dependencies are illustrated below.
+
+```
+____________________________________________________________________________
+|                                                                          |
+|    [[UM]]                                                                |
+|        [[[environment]]]                                                 |
+|            ROSE_APP_OPT_CONF_KEYS = {{CONFIG_OPT}} {{BITCOMP_NRUN_OPT}}  |
+|__________________________________________________________________________|
+   |
+   |    __________________________
+   |    |                        |
+   |--->|    [[ATMOS]]           |
+        |        inherit = UM    |
+        |________________________|
+            |
+            |    _______________________________________________________
+            |    |                                                     |
+            |--->|    [[atmos_main]]                                   |
+            |    |        inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS    |
+            |    |_____________________________________________________|
+            |    _____________________________________________________________________
+            |    |                                                                   |
+            |--->|    [[atmos_main<ens>]]                                            |
+                 |        inherit = PPE_MEMB<ens>, ATMOS_RESOURCE, ATMOS             |
+                 |        [[[environment]]]                                          |
+                 |            ROSE_APP_OPT_CONF_KEYS = ens_${CYLC_TASK_PARAM_ens}    |
+                 |                                    {{CONFIG_OPT}}                 |
+                 |                                    {{BITCOMP_NRUN_OPT}}           |
+                 |___________________________________________________________________|
+```
