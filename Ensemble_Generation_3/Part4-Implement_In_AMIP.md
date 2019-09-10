@@ -168,7 +168,7 @@ To ensure that when ensembling is not required the suite will still run and PPE 
     {% endif %}
 
 ```
-Note that for readability some linebreaks have been added. These are not present in the suite.rc file. Below the ensembled tasks are defined, and presented alongside their non-ensembling counterparts. Each ensembling task :
+Note that for readability some linebreaks have been added. These are not present in the suite.rc file. Below the ensembled tasks are defined, and presented alongside their non-ensembling counterparts:
 
 ```
 [[RUN_MAIN]]

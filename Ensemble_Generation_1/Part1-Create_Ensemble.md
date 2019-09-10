@@ -24,7 +24,7 @@ Index: app/um/rose-app.conf
  !!DR_HOOK_PROFILE_LIMIT=-10.0
  !!DR_HOOK_PROFILE_PROC=-1
 -ENS_MEMBER=0
-+ENS_MEMBER=${ENS_MEMBER}          ######### This assignment uses a valuie exported from cylc
++ENS_MEMBER=${ENS_MEMBER}          ######### This assignment uses a value exported from cylc
  HISTORY=$DATAM/${RUNID}.xhist     ######### The ENS_MEMBER variable in um/rose-app.conf is always present
  PRINT_STATUS=PrStatus_Normal
  RCF_PRINTSTATUS=PrStatus_Normal
@@ -35,9 +35,9 @@ Index: meta/rose-meta.conf
 @@ -194,6 +194,20 @@
  title=Model output data and restart directory
  type=character
- 
+
  ######################################################## Addition of A-CURE Ensembles to the GUI
- 
+
 +[jinja2:suite.rc=ENSEMBLE_SIZE]
 +compulsory=true
 +description=Size of the A-CURE ensemble
@@ -90,19 +90,19 @@ Index: suite.rc
 +        ensemble = {{ range(ENSEMBLE_SIZE) | join(', ') }}
 +
  [scheduling]
- 
-################################### In scheduling, all the atmos_main are replaced by atmos_main<ensemble> 
- 
+
+################################### In scheduling, all the atmos_main are replaced by atmos_main<ensemble>
+
      cycling mode        = {{CALENDAR}}
 @@ -62,7 +65,7 @@
- 
+
          {% if RUN %}
          [[[ R1 ]]]
 -            graph = recon => atmos_main
 +            graph = recon => atmos_main<ensemble>
          {% endif %}
  {% endif %}
- 
+
 @@ -69,20 +72,20 @@
  {% if RUN %}
          {% if BUILD_UM %}
@@ -110,15 +110,15 @@ Index: suite.rc
 -            graph = {{FCMUM_LAST}} => atmos_main
 +            graph = {{FCMUM_LAST}} => atmos_main<ensemble>
          {% endif %}
- 
+
          [[[ R1 ]]]
 -            graph = install_ancil => atmos_main
 +            graph = install_ancil => atmos_main<ensemble>
- 
+
          [[[ {{RESUB}} ]]]
 -            graph = atmos_main => housekeeping
 +            graph = atmos_main<ensemble> => housekeeping
- 
+
          {% if POSTPROC %}
          [[[R1]]]
              graph = fcm_make_pp => fcm_make2_pp => postproc
@@ -129,23 +129,23 @@ Index: suite.rc
          [[[R1]]]
              graph = fcm_make_pptransfer => fcm_make2_pptransfer => pptransfer
 @@ -106,7 +109,7 @@
- 
+
          {% if ARCH_WALL %}
          [[[ R1//^+{{RUNLEN}}-{{RESUB}} ]]]
 -            graph = atmos_main => rose_arch_wallclock
 +            graph = atmos_main<ensemble> => rose_arch_wallclock
          {% endif %}
- 
+
  # Include tests graph if required
 @@ -191,11 +194,23 @@
- 
+
      [[recon]]
          inherit = RUN_MAIN, RCF_RESOURCE, RECONFIGURE
 +        [[[environment]]]
 +            ASTART=$ROSE_DATA/$RUNID.astart
 +            DATAM=$ROSE_DATA/{{DATAM}}
 +            ENS_MEMBER=0
- 
+
      [[atmos_main]]
          inherit = RUN_MAIN, ATMOS_RESOURCE, ATMOS
          post-script = save_wallclock.sh {{RESUB}}
@@ -162,7 +162,7 @@ Index: suite.rc
 +            ENS_MEMBER=${CYLC_TASK_PARAM_ensemble}
 ###################################### Leaving the {} off the CYLC_TASK_PARAM_ensemble variable results in
 ###################################### and "unbound variable" error
-            
+
      [[fcm_make_pp]]
          inherit = RUN_MAIN, EXTRACT_RESOURCE
      [[fcm_make2_pp]]
@@ -175,11 +175,11 @@ So, to summarise, the changes to the `suite.rc` file consist of:
 
 * adding in an `atmos_main<ensemble>` task which overwrites the data output location. **THIS HAS NOT BEEN CORRECTLY IMPLEMENTED ABOVE**
 
-In addition to this, 
+In addition to this,
 
 * the `rose-suite.conf` file needs the `ENSEMBLE_SIZE` parameter to be present to pass to suite.rc on running
 * the `app/um/rose-app.conf` file needs `ENS_MEMBER=${ENS_MEMBER}` which is passed from suite.rc and replaces default value of `ENS_MEMBER=0`
-* the `meta/rose-meta.conf` file should have an entry for the Ensemble_Size parameter so that it appears in the rose GUI. This is not however necessary as if this is not included the parameter will apper in the `jinja2` heading in the GUI. 
+* the `meta/rose-meta.conf` file should have an entry for the Ensemble_Size parameter so that it appears in the rose GUI. This is not however necessary as if this is not included the parameter will apper in the `jinja2` heading in the GUI.
 
 Work is still ongoing to ensure that :
 1. the output data goes to the correct place
@@ -191,16 +191,16 @@ With regards to the perturbation, the UKESM suite with Ensembles uses a python s
                      fcm_make_um
                           |
                     fcm_make2_um --¬  install_ancils
-                     |    \   \     \/    /     /| 
+                     |    \   \     \/    /     /|
                      |     \   \   / \  /     /  |
-                     |      \   \/    X     /    | 
+                     |      \   \/    X     /    |
                      |       \ / recon \  /      |
                      |       /\/  |   \ X        |
                      |     / / \  |   /\ \       |
                      |   / /    \ | /   \ \      |
                   perturb0    perturb1    perturb2
-                     |           |           | 
-                     |           |           | 
+                     |           |           |
+                     |           |           |
                   atmos_       atmos_      atmos_
                   main_        main_       main_
                   ensemble0    ensemble1   ensemble2
