@@ -1,6 +1,6 @@
 # Converting a Rose Suite for Perturbed Parameter Ensemble (PPE) Experiments
 
-To convert a rose suite for use in a PPE experiment, or for use in any general ensembling system, there are two main changes. The first is the creation of a python script to change the initial parameters for each run, and the inclusion of this script in the cylc task list. The second change is the creation of a parametrised task set within cylc to create the ensemble and keep the data output streams separate. The example I will be referring to in this document is the ACURE PPE suite [u-bi318], within which these changes have been made to convert the atmosphere-only UKESM AMIP suite to an ensembling suite.
+To convert a rose suite for use in a PPE experiment, or for use in any general ensembling system, there are two main changes. The first is the creation of a python script to change the initial parameters for each run, and the inclusion of this script in the cylc task list. The second change is the creation of a parametrised task set within cylc to create the ensemble and keep the data output streams separate. The example I will be referring to in this document is the ACURE PPE suite [u-bi318], within which these changes have been made to convert the atmosphere-only UKESM AMIP suite to an ensembling suite. The associated perturbation script is held within this suite on the repository, so any copy of the suite will have all the code needed to reproduce the changes made so that they can be adapted to a different situation.
 
 ## 1. Creation of the perturbation script
 
